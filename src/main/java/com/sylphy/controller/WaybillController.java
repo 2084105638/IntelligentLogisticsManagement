@@ -21,15 +21,15 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/waybill")
 public class WaybillController {
-
+    
     private final WaybillService waybillService;
     private final RedisCache redisCache;
-
+    
     public WaybillController(WaybillService waybillService, RedisCache redisCache) {
         this.waybillService = waybillService;
         this.redisCache = redisCache;
     }
-
+    
     /**
      * 发布运单
      */
@@ -46,16 +46,21 @@ public class WaybillController {
         Long waybillId = waybillService.createWaybill(consignorId, createDTO);
         return Result.success("运单创建成功", waybillId);
     }
-
+    
     /**
      * 查询运单详情
      */
     @GetMapping("/{waybillId}")
-    public Result<WaybillVO> getWaybillDetail(@PathVariable Long waybillId) {
-        WaybillVO waybillVO = waybillService.getWaybillDetail(waybillId);
+    public Result<WaybillVO> getWaybillDetail(@RequestHeader("Authorization") String token,
+                                              @PathVariable Long waybillId) {
+        Long consignorId = redisCache.getConsignorIdByToken(token);
+        if (consignorId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        WaybillVO waybillVO = waybillService.getWaybillDetail(waybillId,consignorId);
         return Result.success(waybillVO);
     }
-
+    
     /**
      * 查询货主的历史运单（分页）
      */
@@ -68,11 +73,11 @@ public class WaybillController {
         if (consignorId == null) {
             return Result.error(401, "Token 已过期，请重新登录");
         }
-
+        
         PageResult<WaybillVO> result = waybillService.queryConsignorWaybills(consignorId, queryDTO);
         return Result.success(result);
     }
-
+    
     /**
      * 取消运单
      */
@@ -85,7 +90,7 @@ public class WaybillController {
         if (consignorId == null) {
             return Result.error(401, "Token 已过期，请重新登录");
         }
-
+        
         waybillService.cancelWaybill(waybillId, consignorId);
         return Result.success("运单取消成功");
     }
