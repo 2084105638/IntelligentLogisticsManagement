@@ -1,54 +1,74 @@
-package generate;
+package com.sylphy.entity.model;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
-import lombok.Data;
 
 /**
  * sys_waybill
  */
 @Data
+@TableName("sys_waybill")
 public class Waybill implements Serializable {
     /**
      * 运单主键 id
      */
+    @TableId(value = "waybill_id", type = IdType.AUTO)
     private Long waybillId;
+
+    /**
+     * 货主 ID
+     */
+    @TableField("consignor_id")
+    private Long consignorId;
 
     /**
      * 货物信息
      */
+    @TableField("goods_information")
     private String goodsInformation;
 
     /**
      * 起始地址
      */
+    @TableField("start_address")
     private String startAddress;
 
     /**
      * 结束地址
      */
+    @TableField("end_address")
     private String endAddress;
 
     /**
      * 创建时间
      */
+    @TableField("create_time")
     private Date createTime;
 
     /**
      * 期望时效
      */
+    @TableField("expected_time_limit")
     private Date expectedTimeLimit;
 
     /**
      * 费用
      */
+    @TableField("cost")
     private BigDecimal cost;
 
     /**
      * 状态 待分配:0 已分配:1 运输中: 2 已完成:3
      */
-    private Boolean status;
+    @TableField("status")
+    private Integer status;
 
     private static final long serialVersionUID = 1L;
 }

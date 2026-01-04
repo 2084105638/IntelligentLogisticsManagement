@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sylphy.mapper.WaybillDao">
-  <resultMap id="BaseResultMap" type="generate.Waybill">
+  <resultMap id="BaseResultMap" type="com.sylphy.entity.model.Waybill">
     <id column="waybill_id" jdbcType="BIGINT" property="waybillId" />
     <result column="goods_information" jdbcType="VARCHAR" property="goodsInformation" />
     <result column="start_address" jdbcType="VARCHAR" property="startAddress" />
@@ -25,7 +25,7 @@
     delete from sys_waybill
     where waybill_id = #{waybillId,jdbcType=BIGINT}
   </delete>
-  <insert id="insert" keyColumn="waybill_id" keyProperty="waybillId" parameterType="generate.Waybill" useGeneratedKeys="true">
+  <insert id="insert" keyColumn="waybill_id" keyProperty="waybillId" parameterType="com.sylphy.entity.model.Waybill" useGeneratedKeys="true">
     insert into sys_waybill (goods_information, start_address, end_address, 
       create_time, expected_time_limit, cost, 
       `status`)
@@ -33,7 +33,7 @@
       #{createTime,jdbcType=TIMESTAMP}, #{expectedTimeLimit,jdbcType=TIMESTAMP}, #{cost,jdbcType=DECIMAL}, 
       #{status,jdbcType=BOOLEAN})
   </insert>
-  <insert id="insertSelective" keyColumn="waybill_id" keyProperty="waybillId" parameterType="generate.Waybill" useGeneratedKeys="true">
+  <insert id="insertSelective" keyColumn="waybill_id" keyProperty="waybillId" parameterType="com.sylphy.entity.model.Waybill" useGeneratedKeys="true">
     insert into sys_waybill
     <trim prefix="(" suffix=")" suffixOverrides=",">
       <if test="goodsInformation != null">
@@ -82,7 +82,7 @@
       </if>
     </trim>
   </insert>
-  <update id="updateByPrimaryKeySelective" parameterType="generate.Waybill">
+  <update id="updateByPrimaryKeySelective" parameterType="com.sylphy.entity.model.Waybill">
     update sys_waybill
     <set>
       <if test="goodsInformation != null">
@@ -109,7 +109,7 @@
     </set>
     where waybill_id = #{waybillId,jdbcType=BIGINT}
   </update>
-  <update id="updateByPrimaryKey" parameterType="generate.Waybill">
+  <update id="updateByPrimaryKey" parameterType="com.sylphy.entity.model.Waybill">
     update sys_waybill
     set goods_information = #{goodsInformation,jdbcType=VARCHAR},
       start_address = #{startAddress,jdbcType=VARCHAR},

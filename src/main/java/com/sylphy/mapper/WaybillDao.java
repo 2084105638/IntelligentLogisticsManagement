@@ -1,10 +1,14 @@
 package com.sylphy.mapper;
 
-import generate.Waybill;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sylphy.entity.model.Waybill;
+import org.apache.ibatis.annotations.Mapper;
 
-public interface WaybillDao {
+@Mapper
+public interface WaybillDao extends BaseMapper<Waybill> {
     int deleteByPrimaryKey(Long waybillId);
 
+    @Override
     int insert(Waybill record);
 
     int insertSelective(Waybill record);
