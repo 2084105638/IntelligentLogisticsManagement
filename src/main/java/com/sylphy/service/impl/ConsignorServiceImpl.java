@@ -52,10 +52,10 @@ public class ConsignorServiceImpl implements ConsignorService {
             throw new BusinessException("该邮箱已注册");
         }
 
-        // 创建用户
+        // 创建用户 - 使用 MyBatis Plus 的 insert 方法
         User user = new User();
-        user.setType(true); // 1:货主
-        userDao.insertSelective(user);
+        user.setType(1); // 1:货主
+        userDao.insert(user);
 
         // 创建货主
         Consignor consignor = new Consignor();
@@ -65,7 +65,7 @@ public class ConsignorServiceImpl implements ConsignorService {
         // 密码加密
         consignor.setPassword(DigestUtil.md5Hex(registerDTO.getPassword()));
 
-        consignorDao.insertSelective(consignor);
+        consignorDao.insert(consignor);
         log.info("货主注册成功，consignorId: {}", consignor.getConsignorId());
     }
 
@@ -136,7 +136,7 @@ public class ConsignorServiceImpl implements ConsignorService {
         }
 
         // 缓存不存在，从数据库查询
-        consignor = consignorDao.selectByPrimaryKey(consignorId);
+        consignor = consignorDao.selectById(consignorId);
         if (consignor == null) {
             throw new BusinessException("用户不存在");
         }
@@ -150,20 +150,25 @@ public class ConsignorServiceImpl implements ConsignorService {
      * 根据手机号查询货主
      */
     private Consignor selectByPhone(String phone) {
-        return consignorDao.selectByPhone(phone);
+        return consignorDao.selectOne(new LambdaQueryWrapper<Consignor>()
+                .eq(Consignor::getPhone, phone));
     }
 
     /**
      * 根据邮箱查询货主
      */
     private Consignor selectByEmail(String email) {
-        return consignorDao.selectByEmail(email);
+        return consignorDao.selectOne(new LambdaQueryWrapper<Consignor>()
+                .eq(Consignor::getEmail, email));
     }
 
     /**
      * 根据账号（手机号或邮箱）查询货主
      */
     private Consignor selectByAccount(String account) {
-        return consignorDao.selectByAccount(account);
+        return consignorDao.selectOne(new LambdaQueryWrapper<Consignor>()
+                .eq(Consignor::getPhone, account)
+                .or()
+                .eq(Consignor::getEmail, account));
     }
 }
