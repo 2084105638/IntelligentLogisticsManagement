@@ -18,6 +18,9 @@ import java.util.Date;
 @Data
 public class WaybillCreateDTO {
 
+    @NotNull(message = "收货者ID不能为空")
+    private Long receivingConsignorId;
+
     @NotBlank(message = "货物信息不能为空")
     private String goodsInformation;
 
