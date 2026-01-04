@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sylphy.mapper.WaybillDao">
+  <resultMap id="BaseResultMap" type="generate.Waybill">
+    <id column="waybill_id" jdbcType="BIGINT" property="waybillId" />
+    <result column="goods_information" jdbcType="VARCHAR" property="goodsInformation" />
+    <result column="start_address" jdbcType="VARCHAR" property="startAddress" />
+    <result column="end_address" jdbcType="VARCHAR" property="endAddress" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="expected_time_limit" jdbcType="TIMESTAMP" property="expectedTimeLimit" />
+    <result column="cost" jdbcType="DECIMAL" property="cost" />
+    <result column="status" jdbcType="BOOLEAN" property="status" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    waybill_id, goods_information, start_address, end_address, create_time, expected_time_limit, 
+    cost, `status`
+  </sql>
+  <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from sys_waybill
+    where waybill_id = #{waybillId,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+    delete from sys_waybill
+    where waybill_id = #{waybillId,jdbcType=BIGINT}
+  </delete>
+  <insert id="insert" keyColumn="waybill_id" keyProperty="waybillId" parameterType="generate.Waybill" useGeneratedKeys="true">
+    insert into sys_waybill (goods_information, start_address, end_address, 
+      create_time, expected_time_limit, cost, 
+      `status`)
+    values (#{goodsInformation,jdbcType=VARCHAR}, #{startAddress,jdbcType=VARCHAR}, #{endAddress,jdbcType=VARCHAR}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{expectedTimeLimit,jdbcType=TIMESTAMP}, #{cost,jdbcType=DECIMAL}, 
+      #{status,jdbcType=BOOLEAN})
+  </insert>
+  <insert id="insertSelective" keyColumn="waybill_id" keyProperty="waybillId" parameterType="generate.Waybill" useGeneratedKeys="true">
+    insert into sys_waybill
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="goodsInformation != null">
+        goods_information,
+      </if>
+      <if test="startAddress != null">
+        start_address,
+      </if>
+      <if test="endAddress != null">
+        end_address,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+      <if test="expectedTimeLimit != null">
+        expected_time_limit,
+      </if>
+      <if test="cost != null">
+        cost,
+      </if>
+      <if test="status != null">
+        `status`,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="goodsInformation != null">
+        #{goodsInformation,jdbcType=VARCHAR},
+      </if>
+      <if test="startAddress != null">
+        #{startAddress,jdbcType=VARCHAR},
+      </if>
+      <if test="endAddress != null">
+        #{endAddress,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="expectedTimeLimit != null">
+        #{expectedTimeLimit,jdbcType=TIMESTAMP},
+      </if>
+      <if test="cost != null">
+        #{cost,jdbcType=DECIMAL},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=BOOLEAN},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="generate.Waybill">
+    update sys_waybill
+    <set>
+      <if test="goodsInformation != null">
+        goods_information = #{goodsInformation,jdbcType=VARCHAR},
+      </if>
+      <if test="startAddress != null">
+        start_address = #{startAddress,jdbcType=VARCHAR},
+      </if>
+      <if test="endAddress != null">
+        end_address = #{endAddress,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="expectedTimeLimit != null">
+        expected_time_limit = #{expectedTimeLimit,jdbcType=TIMESTAMP},
+      </if>
+      <if test="cost != null">
+        cost = #{cost,jdbcType=DECIMAL},
+      </if>
+      <if test="status != null">
+        `status` = #{status,jdbcType=BOOLEAN},
+      </if>
+    </set>
+    where waybill_id = #{waybillId,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="generate.Waybill">
+    update sys_waybill
+    set goods_information = #{goodsInformation,jdbcType=VARCHAR},
+      start_address = #{startAddress,jdbcType=VARCHAR},
+      end_address = #{endAddress,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      expected_time_limit = #{expectedTimeLimit,jdbcType=TIMESTAMP},
+      cost = #{cost,jdbcType=DECIMAL},
+      `status` = #{status,jdbcType=BOOLEAN}
+    where waybill_id = #{waybillId,jdbcType=BIGINT}
+  </update>
+</mapper>
