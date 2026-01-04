@@ -28,9 +28,10 @@ public interface WaybillService extends IService<Waybill> {
      * 查询运单详情
      *
      * @param waybillId 运单ID
+     * @param id
      * @return 运单详情
      */
-    WaybillVO getWaybillDetail(Long waybillId);
+    WaybillVO getWaybillDetail(Long waybillId, Long id);
 
     /**
      * 分页查询货主的历史运单
