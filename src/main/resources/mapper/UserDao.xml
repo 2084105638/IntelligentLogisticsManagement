@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sylphy.mapper.UserDao">
-  <resultMap id="BaseResultMap" type="com.sylphy.entity.dao.User">
+  <resultMap id="BaseResultMap" type="com.sylphy.entity.model.User">
     <id column="user_id" jdbcType="BIGINT" property="userId" />
     <result column="type" jdbcType="BOOLEAN" property="type" />
   </resultMap>
@@ -20,11 +20,11 @@
     delete from sys_user
     where user_id = #{userId,jdbcType=BIGINT}
   </delete>
-  <insert id="insert" keyColumn="user_id" keyProperty="userId" parameterType="com.sylphy.entity.dao.User" useGeneratedKeys="true">
+  <insert id="insert" keyColumn="user_id" keyProperty="userId" parameterType="com.sylphy.entity.model.User" useGeneratedKeys="true">
     insert into sys_user (`type`)
     values (#{type,jdbcType=BOOLEAN})
   </insert>
-  <insert id="insertSelective" keyColumn="user_id" keyProperty="userId" parameterType="com.sylphy.entity.dao.User" useGeneratedKeys="true">
+  <insert id="insertSelective" keyColumn="user_id" keyProperty="userId" parameterType="com.sylphy.entity.model.User" useGeneratedKeys="true">
     insert into sys_user
     <trim prefix="(" suffix=")" suffixOverrides=",">
       <if test="type != null">
@@ -37,7 +37,7 @@
       </if>
     </trim>
   </insert>
-  <update id="updateByPrimaryKeySelective" parameterType="com.sylphy.entity.dao.User">
+  <update id="updateByPrimaryKeySelective" parameterType="com.sylphy.entity.model.User">
     update sys_user
     <set>
       <if test="type != null">
@@ -46,7 +46,7 @@
     </set>
     where user_id = #{userId,jdbcType=BIGINT}
   </update>
-  <update id="updateByPrimaryKey" parameterType="com.sylphy.entity.dao.User">
+  <update id="updateByPrimaryKey" parameterType="com.sylphy.entity.model.User">
     update sys_user
     set `type` = #{type,jdbcType=BOOLEAN}
     where user_id = #{userId,jdbcType=BIGINT}

@@ -1,6 +1,6 @@
 package com.sylphy.mapper;
 
-import com.sylphy.entity.dao.User;
+import com.sylphy.entity.model.User;
 
 public interface UserDao {
     int deleteByPrimaryKey(Long userId);

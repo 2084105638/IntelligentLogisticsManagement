@@ -1,4 +1,4 @@
-package com.sylphy.entity.dao;
+package com.sylphy.entity.model;
 
 import java.io.Serializable;
 import lombok.Data;

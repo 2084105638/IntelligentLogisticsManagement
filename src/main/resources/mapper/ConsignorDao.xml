@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sylphy.mapper.ConsignorDao">
-  <resultMap id="BaseResultMap" type="com.sylphy.entity.dao.Consignor">
+  <resultMap id="BaseResultMap" type="com.sylphy.entity.model.Consignor">
     <id column="consignor_id" jdbcType="BIGINT" property="consignorId" />
     <result column="user_id" jdbcType="BIGINT" property="userId" />
     <result column="email" jdbcType="VARCHAR" property="email" />
@@ -21,13 +21,13 @@
     delete from sys_consignor
     where consignor_id = #{consignorId,jdbcType=BIGINT}
   </delete>
-  <insert id="insert" keyColumn="consignor_id" keyProperty="consignorId" parameterType="com.sylphy.entity.dao.Consignor" useGeneratedKeys="true">
+  <insert id="insert" keyColumn="consignor_id" keyProperty="consignorId" parameterType="com.sylphy.entity.model.Consignor" useGeneratedKeys="true">
     insert into sys_consignor (user_id, email, phone, 
       `password`)
     values (#{userId,jdbcType=BIGINT}, #{email,jdbcType=VARCHAR}, #{phone,jdbcType=VARCHAR}, 
       #{password,jdbcType=VARCHAR})
   </insert>
-  <insert id="insertSelective" keyColumn="consignor_id" keyProperty="consignorId" parameterType="com.sylphy.entity.dao.Consignor" useGeneratedKeys="true">
+  <insert id="insertSelective" keyColumn="consignor_id" keyProperty="consignorId" parameterType="com.sylphy.entity.model.Consignor" useGeneratedKeys="true">
     insert into sys_consignor
     <trim prefix="(" suffix=")" suffixOverrides=",">
       <if test="userId != null">
@@ -58,7 +58,7 @@
       </if>
     </trim>
   </insert>
-  <update id="updateByPrimaryKeySelective" parameterType="com.sylphy.entity.dao.Consignor">
+  <update id="updateByPrimaryKeySelective" parameterType="com.sylphy.entity.model.Consignor">
     update sys_consignor
     <set>
       <if test="userId != null">
@@ -76,7 +76,7 @@
     </set>
     where consignor_id = #{consignorId,jdbcType=BIGINT}
   </update>
-  <update id="updateByPrimaryKey" parameterType="com.sylphy.entity.dao.Consignor">
+  <update id="updateByPrimaryKey" parameterType="com.sylphy.entity.model.Consignor">
     update sys_consignor
     set user_id = #{userId,jdbcType=BIGINT},
       email = #{email,jdbcType=VARCHAR},
@@ -84,4 +84,27 @@
       `password` = #{password,jdbcType=VARCHAR}
     where consignor_id = #{consignorId,jdbcType=BIGINT}
   </update>
+
+  <!-- 自定义查询方法 -->
+  <select id="selectByPhone" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from sys_consignor
+    where phone = #{phone,jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectByEmail" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from sys_consignor
+    where email = #{email,jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectByAccount" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from sys_consignor
+    where phone = #{account,jdbcType=VARCHAR}
+       or email = #{account,jdbcType=VARCHAR}
+  </select>
 </mapper>
