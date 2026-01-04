@@ -3,7 +3,7 @@ package com.sylphy.service.impl;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sylphy.common.RedisCache;
-import com.sylphy.common.TokenUtil;
+import com.sylphy.common.StringTools;
 import com.sylphy.dto.ConsignorLoginDTO;
 import com.sylphy.dto.ConsignorRegisterDTO;
 import com.sylphy.entity.model.Consignor;
@@ -54,6 +54,7 @@ public class ConsignorServiceImpl implements ConsignorService {
 
         // 创建用户 - 使用 MyBatis Plus 的 insert 方法
         User user = new User();
+        user.setUsername(StringTools.randomUsername());
         user.setType(1); // 1:货主
         userDao.insert(user);
 
@@ -84,7 +85,7 @@ public class ConsignorServiceImpl implements ConsignorService {
         }
 
         // 生成 Token
-        String token = TokenUtil.generateToken();
+        String token = StringTools.generateToken();
 
         // 保存 Token 到 Redis
         redisCache.saveToken(token, consignor.getConsignorId());

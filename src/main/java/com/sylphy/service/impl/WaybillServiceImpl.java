@@ -64,6 +64,7 @@ public class WaybillServiceImpl extends ServiceImpl<WaybillDao, Waybill> impleme
         waybill.setExpectedTimeLimit(createDTO.getExpectedTimeLimit());
         waybill.setCost(createDTO.getCost());
         waybill.setStatus(WaybillStatus.PENDING_ALLOCATION.getCode());
+        waybill.setChanged(0);
         waybill.setCreateTime(new Date());
         
         // 保存运单

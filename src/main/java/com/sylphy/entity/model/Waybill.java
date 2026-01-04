@@ -82,5 +82,11 @@ public class Waybill implements Serializable {
     @TableField("car_id")
     private Long carId;
     
+    /**
+     * 是否已被修改 未被修改:0 已被修改:1
+     */
+    @TableField("changed")
+    private Integer changed;
+    
     private static final long serialVersionUID = 1L;
 }
