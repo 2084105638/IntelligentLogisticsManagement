@@ -1,17 +1,11 @@
 package com.sylphy.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.sylphy.entity.model.User;
+import org.apache.ibatis.annotations.Mapper;
 
-public interface UserDao {
-    int deleteByPrimaryKey(Long userId);
-
-    int insert(User record);
-
-    int insertSelective(User record);
-
-    User selectByPrimaryKey(Long userId);
-
-    int updateByPrimaryKeySelective(User record);
-
-    int updateByPrimaryKey(User record);
+@Mapper
+public interface UserDao extends BaseMapper<User> {
+    // 删除重写的方法，直接使用 BaseMapper 提供的方法
+    // BaseMapper 已经提供了 insert, selectById, updateById, deleteById 等方法
 }
