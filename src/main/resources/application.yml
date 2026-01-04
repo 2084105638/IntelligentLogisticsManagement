@@ -33,8 +33,8 @@ mybatis-plus:
     map-underscore-to-camel-case: true
   global-config:
     db-config:
-      # 主键策略
-      id-type: auto
+      # 主键策略 - 使用雪花算法
+      id-type: assign_id
       # 逻辑删除字段
       logic-delete-field: deleted
       logic-delete-value: 1
