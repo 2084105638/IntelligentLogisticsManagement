@@ -105,7 +105,11 @@ public class WaybillServiceImpl extends ServiceImpl<WaybillDao, Waybill> impleme
                         Waybill::getStartAddress, queryDTO.getStartAddress())
                 .like(StringUtils.hasText(queryDTO.getEndAddress()),
                         Waybill::getEndAddress, queryDTO.getEndAddress())
-                .orderByDesc(Waybill::getCreateTime);
+                .ge(queryDTO.getStartTime() != null, Waybill::getCreateTime, queryDTO.getStartTime())
+                .le(queryDTO.getEndTime() != null, Waybill::getCreateTime, queryDTO.getEndTime());
+
+
+        queryWrapper.orderByDesc(Waybill::getCreateTime);
         
         // 分页查询
         Page<Waybill> page = new Page<>(queryDTO.getCurrent(), queryDTO.getSize());

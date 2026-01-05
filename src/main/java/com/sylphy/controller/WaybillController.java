@@ -9,7 +9,10 @@ import com.sylphy.service.WaybillService;
 import com.sylphy.vo.WaybillVO;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Date;
 
 /**
  * 运单 Controller
@@ -31,24 +34,25 @@ public class WaybillController {
     }
     
     /**
-     * 发布运单
+     * 创建运单
      */
     @PostMapping("/create")
-    public Result<Long> createWaybill(
-            @RequestHeader("Authorization") String token,
-            @Valid @RequestBody WaybillCreateDTO createDTO) {
-        // 从 Token 获取货主ID
+    public Result<Long> createWaybill(@RequestHeader("Authorization") String token,
+                                      @Valid @RequestBody WaybillCreateDTO createDTO) {
         Long consignorId = redisCache.getConsignorIdByToken(token);
         if (consignorId == null) {
             return Result.error(401, "Token 已过期，请重新登录");
         }
-
+        
+        // 刷新 token
+        redisCache.refreshToken(token);
+        
         Long waybillId = waybillService.createWaybill(consignorId, createDTO);
-        return Result.success("运单创建成功", waybillId);
+        return Result.success(waybillId);
     }
     
     /**
-     * 查询运单详情
+     * 获取运单详情
      */
     @GetMapping("/{waybillId}")
     public Result<WaybillVO> getWaybillDetail(@RequestHeader("Authorization") String token,
@@ -57,41 +61,96 @@ public class WaybillController {
         if (consignorId == null) {
             return Result.error(401, "Token 已过期，请重新登录");
         }
-        WaybillVO waybillVO = waybillService.getWaybillDetail(waybillId,consignorId);
+        
+        // 刷新 token
+        redisCache.refreshToken(token);
+        
+        WaybillVO waybillVO = waybillService.getWaybillDetail(waybillId, consignorId);
         return Result.success(waybillVO);
     }
     
     /**
-     * 查询历史运单（分页）
+     * 查询运单列表
      */
     @PostMapping("/list")
-    public Result<PageResult<WaybillVO>> queryWaybills(
-            @RequestHeader("Authorization") String token,
-            @RequestBody WaybillQueryDTO queryDTO) {
-        // 从 Token 获取货主ID
+    public Result<PageResult<WaybillVO>> queryWaybills(@RequestHeader("Authorization") String token,
+                                                       @RequestBody WaybillQueryDTO queryDTO) {
         Long consignorId = redisCache.getConsignorIdByToken(token);
         if (consignorId == null) {
             return Result.error(401, "Token 已过期，请重新登录");
         }
+        
+        // 刷新 token
+        redisCache.refreshToken(token);
         
         PageResult<WaybillVO> result = waybillService.queryConsignorWaybills(consignorId, queryDTO);
         return Result.success(result);
     }
     
     /**
+     * 根据状态查询运单
+     */
+    @GetMapping("/listByStatus")
+    public Result<PageResult<WaybillVO>> queryByStatus(@RequestHeader("Authorization") String token,
+                                                       @RequestParam(required = false) Integer status,
+                                                       @RequestParam(defaultValue = "1") Long current,
+                                                       @RequestParam(defaultValue = "10") Long size) {
+        Long consignorId = redisCache.getConsignorIdByToken(token);
+        if (consignorId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        redisCache.refreshToken(token);
+        
+        WaybillQueryDTO queryDTO = new WaybillQueryDTO();
+        queryDTO.setStatus(status);
+        queryDTO.setCurrent(current);
+        queryDTO.setSize(size);
+        
+        PageResult<WaybillVO> result = waybillService.queryConsignorWaybills(consignorId, queryDTO);
+        return Result.success(result);
+    }
+    
+    /**
+     * 根据时间查询运单
+     */
+    @GetMapping("/listByTime")
+    public Result<PageResult<WaybillVO>> queryByTime(@RequestHeader("Authorization") String token,
+                                                     @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date startTime,
+                                                     @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date endTime,
+                                                     @RequestParam(defaultValue = "1") Long current,
+                                                     @RequestParam(defaultValue = "10") Long size) {
+        Long consignorId = redisCache.getConsignorIdByToken(token);
+        if (consignorId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        redisCache.refreshToken(token);
+        
+        WaybillQueryDTO queryDTO = new WaybillQueryDTO();
+        queryDTO.setStartTime(startTime);
+        queryDTO.setEndTime(endTime);
+        queryDTO.setCurrent(current);
+        queryDTO.setSize(size);
+        
+        PageResult<WaybillVO> result = waybillService.queryConsignorWaybills(consignorId, queryDTO);
+        return Result.success(result);
+    }
+    
+    
+    /**
      * 取消运单
      */
     @DeleteMapping("/{waybillId}")
-    public Result cancelWaybill(
-            @RequestHeader("Authorization") String token,
-            @PathVariable Long waybillId) {
-        // 从 Token 获取货主ID
+    public Result cancelWaybill(@RequestHeader("Authorization") String token,
+                                @PathVariable Long waybillId) {
         Long consignorId = redisCache.getConsignorIdByToken(token);
         if (consignorId == null) {
             return Result.error(401, "Token 已过期，请重新登录");
         }
         
+        // 刷新 token
+        redisCache.refreshToken(token);
+        
         waybillService.cancelWaybill(waybillId, consignorId);
-        return Result.success("运单取消成功");
+        return Result.success("取消运单成功");
     }
 }
