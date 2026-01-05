@@ -1,21 +1,36 @@
 package com.sylphy.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.sylphy.common.PageResult;
 import com.sylphy.common.RedisCache;
 import com.sylphy.common.StringTools;
+import com.sylphy.common.WaybillStatus;
 import com.sylphy.dto.DriverLoginDTO;
 import com.sylphy.dto.DriverRegisterDTO;
+import com.sylphy.dto.WaybillQueryDTO;
+import com.sylphy.entity.model.Car;
 import com.sylphy.entity.model.Driver;
 import com.sylphy.entity.model.User;
+import com.sylphy.entity.model.Waybill;
 import com.sylphy.exception.BusinessException;
+import com.sylphy.mapper.CarDao;
 import com.sylphy.mapper.DriverDao;
 import com.sylphy.mapper.UserDao;
+import com.sylphy.mapper.WaybillDao;
 import com.sylphy.service.DriverService;
 import com.sylphy.vo.DriverLoginVO;
+import com.sylphy.vo.WaybillVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author apple
@@ -28,11 +43,15 @@ public class DriverServiceImpl implements DriverService {
     private final DriverDao driverDao;
     private final UserDao userDao;
     private final RedisCache redisCache;
+    private final CarDao carDao;
+    private final WaybillDao waybillDao;
 
-    public DriverServiceImpl(DriverDao driverDao, UserDao userDao, RedisCache redisCache) {
+    public DriverServiceImpl(DriverDao driverDao, UserDao userDao, RedisCache redisCache, CarDao carDao, WaybillDao waybillDao) {
         this.driverDao = driverDao;
         this.userDao = userDao;
         this.redisCache = redisCache;
+        this.carDao = carDao;
+        this.waybillDao = waybillDao;
     }
 
     @Override
@@ -94,6 +113,44 @@ public class DriverServiceImpl implements DriverService {
         vo.setPhone(driver.getPhone());
 
         log.info("司机登录成功，driverId: {}", driver.getDriverId());
+        return vo;
+    }
+
+    @Override
+    public PageResult<WaybillVO> queryWaybills(Long driverId, WaybillQueryDTO queryDTO) {
+        // 1. 获取该司机的所有车辆ID
+        List<Car> cars = carDao.selectList(new LambdaQueryWrapper<Car>().eq(Car::getDriverId, driverId));
+        if (cars == null || cars.isEmpty()) {
+            return new PageResult<>(0L, queryDTO.getCurrent(), queryDTO.getSize(), Collections.emptyList());
+        }
+        List<Long> carIds = cars.stream().map(Car::getCarId).collect(Collectors.toList());
+
+        // 2. 构建运单查询条件
+        LambdaQueryWrapper<Waybill> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(Waybill::getCarId, carIds)
+                .eq(queryDTO.getStatus() != null, Waybill::getStatus, queryDTO.getStatus())
+                .like(StringUtils.hasText(queryDTO.getStartAddress()), Waybill::getStartAddress, queryDTO.getStartAddress())
+                .like(StringUtils.hasText(queryDTO.getEndAddress()), Waybill::getEndAddress, queryDTO.getEndAddress())
+                .ge(queryDTO.getStartTime() != null, Waybill::getCreateTime, queryDTO.getStartTime())
+                .le(queryDTO.getEndTime() != null, Waybill::getCreateTime, queryDTO.getEndTime());
+
+        queryWrapper.orderByDesc(Waybill::getCreateTime);
+
+        // 3. 执行分页查询
+        Page<Waybill> page = new Page<>(queryDTO.getCurrent(), queryDTO.getSize());
+        Page<Waybill> resultPage = waybillDao.selectPage(page, queryWrapper);
+
+        // 4. 转换 VO
+        List<WaybillVO> voList = resultPage.getRecords().stream()
+                .map(this::convertToVO)
+                .collect(Collectors.toList());
+
+        return new PageResult<>(resultPage.getTotal(), resultPage.getCurrent(), resultPage.getSize(), voList);
+    }
+
+    private WaybillVO convertToVO(Waybill waybill) {
+        WaybillVO vo = BeanUtil.copyProperties(waybill, WaybillVO.class);
+        vo.setStatusDesc(WaybillStatus.getDesc(waybill.getStatus()));
         return vo;
     }
 }

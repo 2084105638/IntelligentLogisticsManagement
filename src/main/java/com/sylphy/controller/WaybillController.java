@@ -134,7 +134,31 @@ public class WaybillController {
         PageResult<WaybillVO> result = waybillService.queryConsignorWaybills(consignorId, queryDTO);
         return Result.success(result);
     }
-    
+
+    /**
+     * 根据地址查询运单
+     */
+    @GetMapping("/listByAddress")
+    public Result<PageResult<WaybillVO>> queryByAddress(@RequestHeader("Authorization") String token,
+                                                        @RequestParam(required = false) String startAddress,
+                                                        @RequestParam(required = false) String endAddress,
+                                                        @RequestParam(defaultValue = "1") Long current,
+                                                        @RequestParam(defaultValue = "10") Long size) {
+        Long consignorId = redisCache.getConsignorIdByToken(token);
+        if (consignorId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        redisCache.refreshToken(token);
+
+        WaybillQueryDTO queryDTO = new WaybillQueryDTO();
+        queryDTO.setStartAddress(startAddress);
+        queryDTO.setEndAddress(endAddress);
+        queryDTO.setCurrent(current);
+        queryDTO.setSize(size);
+
+        PageResult<WaybillVO> result = waybillService.queryConsignorWaybills(consignorId, queryDTO);
+        return Result.success(result);
+    }
     
     /**
      * 取消运单

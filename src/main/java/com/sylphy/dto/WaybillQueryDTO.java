@@ -13,17 +13,17 @@ import java.util.Date;
  */
 @Data
 public class WaybillQueryDTO {
-
+    
     /**
      * 运单状态 待分配:0 已分配:1 运输中:2 已完成:3
      */
     private Integer status;
-
+    
     /**
      * 起始地址（模糊查询）
      */
     private String startAddress;
-
+    
     /**
      * 结束地址（模糊查询）
      */
@@ -34,18 +34,18 @@ public class WaybillQueryDTO {
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date startTime;
-
+    
     /**
      * 结束时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date endTime;
-
+    
     /**
      * 页码
      */
     private Long current = 1L;
-
+    
     /**
      * 每页大小
      */

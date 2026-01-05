@@ -1,8 +1,11 @@
 package com.sylphy.service;
 
+import com.sylphy.common.PageResult;
 import com.sylphy.dto.DriverLoginDTO;
 import com.sylphy.dto.DriverRegisterDTO;
+import com.sylphy.dto.WaybillQueryDTO;
 import com.sylphy.vo.DriverLoginVO;
+import com.sylphy.vo.WaybillVO;
 import jakarta.validation.Valid;
 
 /**
@@ -13,4 +16,6 @@ public interface DriverService {
     void register(@Valid DriverRegisterDTO registerDTO);
     
     DriverLoginVO login(@Valid DriverLoginDTO loginDTO);
+
+    PageResult<WaybillVO> queryWaybills(Long driverId, WaybillQueryDTO queryDTO);
 }
