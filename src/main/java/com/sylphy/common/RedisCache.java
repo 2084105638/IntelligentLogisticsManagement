@@ -1,6 +1,8 @@
 package com.sylphy.common;
 
 import com.sylphy.entity.model.Consignor;
+import com.sylphy.entity.model.Dispatcher;
+import com.sylphy.entity.model.Driver;
 import org.springframework.stereotype.Component;
 
 /**
@@ -36,6 +38,30 @@ public class RedisCache {
      * @return 货主ID
      */
     public Long getConsignorIdByToken(String token) {
+        String key = RedisConstants.TOKEN_PREFIX + token;
+        Object value = redisUtil.get(key);
+        return value != null ? Long.valueOf(value.toString()) : null;
+    }
+
+    /**
+     * 获取 Token 对应的调度员ID
+     *
+     * @param token token值
+     * @return 调度员ID
+     */
+    public Long getDispatcherIdByToken(String token) {
+        String key = RedisConstants.TOKEN_PREFIX + token;
+        Object value = redisUtil.get(key);
+        return value != null ? Long.valueOf(value.toString()) : null;
+    }
+
+    /**
+     * 获取 Token 对应的司机ID
+     *
+     * @param token token值
+     * @return 司机ID
+     */
+    public Long getDriverIdByToken(String token) {
         String key = RedisConstants.TOKEN_PREFIX + token;
         Object value = redisUtil.get(key);
         return value != null ? Long.valueOf(value.toString()) : null;
@@ -100,6 +126,90 @@ public class RedisCache {
      */
     public void refreshConsignorInfo(Long consignorId) {
         String key = RedisConstants.CONSIGNOR_INFO_PREFIX + consignorId;
+        redisUtil.expire(key, RedisConstants.USER_INFO_EXPIRE_TIME);
+    }
+
+    /**
+     * 保存调度员信息到缓存
+     *
+     * @param dispatcher 调度员信息
+     */
+    public void saveDispatcherInfo(Dispatcher dispatcher) {
+        String key = RedisConstants.DISPATCHER_INFO_PREFIX + dispatcher.getDispatcherId();
+        redisUtil.set(key, dispatcher, RedisConstants.USER_INFO_EXPIRE_TIME);
+    }
+
+    /**
+     * 从缓存获取调度员信息
+     *
+     * @param dispatcherId 调度员ID
+     * @return 调度员信息
+     */
+    public Dispatcher getDispatcherInfo(Long dispatcherId) {
+        String key = RedisConstants.DISPATCHER_INFO_PREFIX + dispatcherId;
+        Object value = redisUtil.get(key);
+        return value != null ? (Dispatcher) value : null;
+    }
+
+    /**
+     * 删除调度员信息缓存
+     *
+     * @param dispatcherId 调度员ID
+     */
+    public void deleteDispatcherInfo(Long dispatcherId) {
+        String key = RedisConstants.DISPATCHER_INFO_PREFIX + dispatcherId;
+        redisUtil.del(key);
+    }
+
+    /**
+     * 刷新调度员信息缓存过期时间
+     *
+     * @param dispatcherId 调度员ID
+     */
+    public void refreshDispatcherInfo(Long dispatcherId) {
+        String key = RedisConstants.DISPATCHER_INFO_PREFIX + dispatcherId;
+        redisUtil.expire(key, RedisConstants.USER_INFO_EXPIRE_TIME);
+    }
+
+    /**
+     * 保存司机信息到缓存
+     *
+     * @param driver 司机信息
+     */
+    public void saveDriverInfo(Driver driver) {
+        String key = RedisConstants.DRIVER_INFO_PREFIX + driver.getDriverId();
+        redisUtil.set(key, driver, RedisConstants.USER_INFO_EXPIRE_TIME);
+    }
+
+    /**
+     * 从缓存获取司机信息
+     *
+     * @param driverId 司机ID
+     * @return 司机信息
+     */
+    public Driver getDriverInfo(Long driverId) {
+        String key = RedisConstants.DRIVER_INFO_PREFIX + driverId;
+        Object value = redisUtil.get(key);
+        return value != null ? (Driver) value : null;
+    }
+
+    /**
+     * 删除司机信息缓存
+     *
+     * @param driverId 司机ID
+     */
+    public void deleteDriverInfo(Long driverId) {
+        String key = RedisConstants.DRIVER_INFO_PREFIX + driverId;
+        redisUtil.del(key);
+    }
+
+    /**
+     * 刷新司机信息缓存过期时间
+     *
+     * @param driverId 司机ID
+     */
+    public void refreshDriverInfo(Long driverId) {
+        String key = RedisConstants.DRIVER_INFO_PREFIX + driverId;
         redisUtil.expire(key, RedisConstants.USER_INFO_EXPIRE_TIME);
     }
 }

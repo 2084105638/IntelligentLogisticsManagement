@@ -62,7 +62,7 @@ public class WaybillController {
     }
     
     /**
-     * 查询货主的历史运单（分页）
+     * 查询历史运单（分页）
      */
     @PostMapping("/list")
     public Result<PageResult<WaybillVO>> queryWaybills(

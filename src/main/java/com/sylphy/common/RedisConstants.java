@@ -24,6 +24,16 @@ public class RedisConstants {
     public static final String USER_INFO_PREFIX = "user:info:";
 
     /**
+     * 调度员信息前缀
+     */
+    public static final String DISPATCHER_INFO_PREFIX = "dispatcher:info:";
+
+    /**
+     * 司机信息前缀
+     */
+    public static final String DRIVER_INFO_PREFIX = "driver:info:";
+
+    /**
      * Token 过期时间（秒）- 7天
      */
     public static final long TOKEN_EXPIRE_TIME = 7 * 24 * 60 * 60;

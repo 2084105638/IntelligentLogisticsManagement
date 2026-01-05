@@ -1,6 +1,9 @@
 package com.sylphy.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+
+import java.util.Date;
 
 /**
  * 运单查询 DTO
@@ -25,6 +28,23 @@ public class WaybillQueryDTO {
      * 结束地址（模糊查询）
      */
     private String endAddress;
+
+    /**
+     * 地址关键词（同时匹配起始或结束地址）
+     */
+    private String addressKeyword;
+
+    /**
+     * 开始时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date startTime;
+
+    /**
+     * 结束时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date endTime;
 
     /**
      * 页码
