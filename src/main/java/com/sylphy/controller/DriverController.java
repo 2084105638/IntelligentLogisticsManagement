@@ -7,8 +7,10 @@ import com.sylphy.dto.DriverLoginDTO;
 import com.sylphy.dto.DriverRegisterDTO;
 import com.sylphy.dto.WaybillQueryDTO;
 import com.sylphy.common.WaybillStatus;
+import com.sylphy.dto.WaybillExceptionReportDTO;
 import com.sylphy.service.AssignmentService;
 import com.sylphy.service.DriverService;
+import com.sylphy.service.WaybillExceptionService;
 import com.sylphy.vo.DriverLoginVO;
 import com.sylphy.vo.WaybillVO;
 import jakarta.validation.Valid;
@@ -25,12 +27,30 @@ import org.springframework.web.bind.annotation.*;
 public class DriverController {
     private final DriverService driverService;
     private final AssignmentService assignmentService;
+    private final WaybillExceptionService exceptionService;
     private final RedisCache redisCache;
     
-    public DriverController(DriverService driverService, AssignmentService assignmentService, RedisCache redisCache) {
+    public DriverController(DriverService driverService, AssignmentService assignmentService, WaybillExceptionService exceptionService, RedisCache redisCache) {
         this.driverService = driverService;
         this.assignmentService = assignmentService;
+        this.exceptionService = exceptionService;
         this.redisCache = redisCache;
+    }
+
+    /**
+     * 上报运单异常
+     */
+    @PostMapping("/exception")
+    public Result reportException(@RequestHeader("Authorization") String token,
+                                  @Valid @RequestBody WaybillExceptionReportDTO reportDTO) {
+        Long driverId = redisCache.getDriverIdByToken(token);
+        if (driverId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        redisCache.refreshToken(token);
+        
+        exceptionService.reportException(driverId, reportDTO);
+        return Result.success("异常上报成功");
     }
 
     /**
