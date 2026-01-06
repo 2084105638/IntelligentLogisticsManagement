@@ -24,4 +24,8 @@ public class StringTools {
     public static String randomUsername() {
         return RandomUtil.randomString("user", 10);
     }
+    
+    public static Long randomWaybillIdentification() {
+        return RandomUtil.randomLong();
+    }
 }
