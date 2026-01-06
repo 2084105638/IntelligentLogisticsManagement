@@ -218,7 +218,9 @@ public class DispatcherController {
     public Result<Integer> getCarStatus(@RequestHeader("Authorization") String token,
                                         @PathVariable Long carId) {
         Long dispatcherId = redisCache.getDispatcherIdByToken(token);
-        if (dispatcherId == null) return Result.error(401, "Token 已过期，请重新登录");
+        if (dispatcherId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
         return Result.success(carService.getStatus(carId));
     }
     
@@ -237,7 +239,9 @@ public class DispatcherController {
                                   @PathVariable Long carId,
                                   @RequestParam Integer status) {
         Long dispatcherId = redisCache.getDispatcherIdByToken(token);
-        if (dispatcherId == null) return Result.error(401, "Token 已过期，请重新登录");
+        if (dispatcherId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
         carService.updateStatus(carId, status);
         return Result.success("更新成功");
     }
@@ -255,7 +259,9 @@ public class DispatcherController {
     public Result<String> getCarLocation(@RequestHeader("Authorization") String token,
                                          @PathVariable Long carId) {
         Long dispatcherId = redisCache.getDispatcherIdByToken(token);
-        if (dispatcherId == null) return Result.error(401, "Token 已过期，请重新登录");
+        if (dispatcherId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
         return Result.success(carService.getLocation(carId));
     }
     
@@ -274,7 +280,9 @@ public class DispatcherController {
                                     @PathVariable Long carId,
                                     @RequestParam String location) {
         Long dispatcherId = redisCache.getDispatcherIdByToken(token);
-        if (dispatcherId == null) return Result.error(401, "Token 已过期，请重新登录");
+        if (dispatcherId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
         carService.updateLocation(carId, location);
         return Result.success("更新成功");
     }
@@ -294,7 +302,9 @@ public class DispatcherController {
                                @RequestParam Long oldWaybillId,
                                @RequestParam Long carId) {
         Long dispatcherId = redisCache.getDispatcherIdByToken(token);
-        if (dispatcherId == null) return Result.error(401, "Token 已过期，请重新登录");
+        if (dispatcherId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
         // 调用服务：复制旧运单 -> 新运单设置carId与status -> 旧运单标记changed -> 写入历史
         Long newWaybillId = assignmentService.assignVehicle(oldWaybillId, carId, dispatcherId);
         return Result.success(newWaybillId);
@@ -313,7 +323,9 @@ public class DispatcherController {
     public Result<Long> autoAssign(@RequestHeader("Authorization") String token,
                                    @RequestParam Long oldWaybillId) {
         Long dispatcherId = redisCache.getDispatcherIdByToken(token);
-        if (dispatcherId == null) return Result.error(401, "Token 已过期，请重新登录");
+        if (dispatcherId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
         // 简化算法：从可用车辆中选取一辆进行分配
         Long newWaybillId = assignmentService.autoMatchAndAssign(oldWaybillId, dispatcherId);
         return Result.success(newWaybillId);
@@ -334,7 +346,9 @@ public class DispatcherController {
                                  @RequestParam Long oldWaybillId,
                                  @RequestParam Long newCarId) {
         Long dispatcherId = redisCache.getDispatcherIdByToken(token);
-        if (dispatcherId == null) return Result.error(401, "Token 已过期，请重新登录");
+        if (dispatcherId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
         // 重分配：生成新运单并解除旧车辆占用
         Long newWaybillId = assignmentService.reassignVehicle(oldWaybillId, newCarId, dispatcherId);
         return Result.success(newWaybillId);
