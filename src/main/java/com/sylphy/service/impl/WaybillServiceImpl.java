@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sylphy.common.PageResult;
+import com.sylphy.common.StringTools;
 import com.sylphy.common.WaybillStatus;
 import com.sylphy.dto.WaybillCreateDTO;
 import com.sylphy.dto.WaybillQueryDTO;
@@ -66,6 +67,7 @@ public class WaybillServiceImpl extends ServiceImpl<WaybillDao, Waybill> impleme
         waybill.setStatus(WaybillStatus.PENDING_ALLOCATION.getCode());
         waybill.setChanged(0);
         waybill.setCreateTime(new Date());
+        waybill.setWaybillIdentification(StringTools.randomWaybillIdentification());
         
         // 保存运单
         boolean success = save(waybill);
@@ -74,8 +76,8 @@ public class WaybillServiceImpl extends ServiceImpl<WaybillDao, Waybill> impleme
         }
         
         log.info("货主 {} 创建运单成功，运单ID: {}，收货者ID: {}",
-                consignorId, waybill.getWaybillId(), createDTO.getReceivingConsignorId());
-        return waybill.getWaybillId();
+                consignorId, waybill.getWaybillIdentification(), createDTO.getReceivingConsignorId());
+        return waybill.getWaybillIdentification();
     }
     
     @Override

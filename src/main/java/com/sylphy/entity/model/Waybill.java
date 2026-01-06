@@ -1,10 +1,8 @@
 package com.sylphy.entity.model;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import org.apache.ibatis.type.TypeHandler;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -21,6 +19,12 @@ public class Waybill implements Serializable {
      */
     @TableId(value = "waybill_id", type = IdType.ASSIGN_ID)
     private Long waybillId;
+    
+    /**
+     * 运单标识 id，运单标识 id，相同的运单不同的历史具有相同的 id
+     */
+    @TableField(value = "waybill_identification", fill = FieldFill.INSERT)
+    private Long waybillIdentification;
     
     /**
      * 货物信息
