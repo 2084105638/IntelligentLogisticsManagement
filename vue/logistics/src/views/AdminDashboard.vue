@@ -6,7 +6,7 @@
           <h2>系统管理员工作台</h2>
           <div class="user-info">
             <span>管理员</span>
-            <el-button type="text" @click="handleLogout">退出登录</el-button>
+            <el-button link @click="handleLogout">退出登录</el-button>
           </div>
         </div>
       </el-header>

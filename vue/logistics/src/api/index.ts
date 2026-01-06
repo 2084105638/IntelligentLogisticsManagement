@@ -23,7 +23,8 @@ export interface ConsignorRegisterDTO {
 }
 
 export interface ConsignorLoginDTO {
-  phone: string;
+  // 与后端 ConsignorLoginDTO.account 对应，支持手机号或邮箱
+  account: string;
   password: string;
 }
 
@@ -74,7 +75,7 @@ export interface WaybillQueryDTO {
 }
 
 export interface WaybillVO {
-  waybillId: number;
+  waybillId: string; // 使用字符串避免 Long 精度丢失
   consignorId: number;
   goodsInformation: string;
   startAddress: string;
@@ -84,15 +85,16 @@ export interface WaybillVO {
   cost: number;
   status: number;
   statusDesc: string;
+  changed?: number; // 0 表示当前有效运单，1 表示已被替换的旧运单
 }
 
 // 创建运单
 export const createWaybill = (data: WaybillCreateDTO) => {
-  return request.post<Result<number>>('/waybill/create', data);
+  return request.post<Result<string>>('/waybill/create', data);
 };
 
 // 获取运单详情
-export const getWaybillDetail = (waybillId: number) => {
+export const getWaybillDetail = (waybillId: string) => {
   return request.get<Result<WaybillVO>>(`/waybill/${waybillId}`);
 };
 
@@ -116,7 +118,7 @@ export const queryWaybillsByTime = (startTime?: string, endTime?: string, curren
 };
 
 // 取消运单
-export const cancelWaybill = (waybillId: number) => {
+export const cancelWaybill = (waybillId: string) => {
   return request.delete<Result>(`/waybill/${waybillId}`);
 };
 
@@ -167,7 +169,7 @@ export const dispatcherQueryWaybills = (params: DispatcherWaybillQueryDTO) => {
 };
 
 // 获取运单详情（调度员视角）
-export const dispatcherGetWaybill = (waybillId: number) => {
+export const dispatcherGetWaybill = (waybillId: string) => {
   return request.get<Result<WaybillVO>>(`/dispatcher/waybills/${waybillId}`);
 };
 
@@ -257,21 +259,21 @@ export const updateCarLocation = (carId: number, location: string) => {
 
 // ============ 分配相关API ============
 // 手动分配车辆
-export const assignVehicle = (oldWaybillId: number, carId: number) => {
+export const assignVehicle = (oldWaybillId: string, carId: number) => {
   return request.post<Result<number>>('/dispatcher/assign', null, {
     params: { oldWaybillId, carId },
   });
 };
 
 // 自动分配车辆
-export const autoAssignVehicle = (oldWaybillId: number) => {
+export const autoAssignVehicle = (oldWaybillId: string) => {
   return request.post<Result<number>>('/dispatcher/assign/auto', null, {
     params: { oldWaybillId },
   });
 };
 
 // 重新分配车辆
-export const reassignVehicle = (oldWaybillId: number, newCarId: number) => {
+export const reassignVehicle = (oldWaybillId: string, newCarId: number) => {
   return request.post<Result<number>>('/dispatcher/assign/reassign', null, {
     params: { oldWaybillId, newCarId },
   });
@@ -280,8 +282,8 @@ export const reassignVehicle = (oldWaybillId: number, newCarId: number) => {
 // 分配历史记录
 export interface WaybillAssignmentVO {
   assignmentId: number;
-  oldWaybillId: number;
-  newWaybillId: number;
+  oldWaybillId: string;
+  newWaybillId: string;
   operatorId: number;
   operatorName?: string;
   createTime: string;
@@ -306,7 +308,8 @@ export interface DriverRegisterDTO {
 }
 
 export interface DriverLoginDTO {
-  phone: string;
+  // 后端 DriverLoginDTO 使用 account 字段（可为账号/手机号）
+  account: string;
   password: string;
 }
 
@@ -317,6 +320,13 @@ export interface DriverLoginVO {
   name: string;
 }
 
+// 运单异常上报 DTO（与后端 WaybillExceptionReportDTO 对齐）
+export interface WaybillExceptionReportDTO {
+  waybillId: string;
+  description: string;
+  exceptionDate: string; // yyyy-MM-dd HH:mm:ss
+}
+
 // 司机注册
 export const driverRegister = (data: DriverRegisterDTO) => {
   return request.post<Result>('/driver/register', data);
@@ -325,6 +335,26 @@ export const driverRegister = (data: DriverRegisterDTO) => {
 // 司机登录
 export const driverLogin = (data: DriverLoginDTO) => {
   return request.post<Result<DriverLoginVO>>('/driver/login', data);
+};
+
+// 上报运单异常
+export const reportWaybillException = (data: WaybillExceptionReportDTO) => {
+  return request.post<Result>('/driver/exception', data);
+};
+
+// 查询司机运单列表
+export const driverQueryWaybills = (data: WaybillQueryDTO) => {
+  return request.post<Result<PageResult<WaybillVO>>>('/driver/waybills', data);
+};
+
+// 司机开始运输
+export const driverStartWaybill = (waybillId: string) => {
+  return request.post<Result>(`/driver/start/${waybillId}`);
+};
+
+// 司机完成运输
+export const driverCompleteWaybill = (waybillId: string) => {
+  return request.post<Result>(`/driver/complete/${waybillId}`);
 };
 
 // ============ 管理员相关API ============
