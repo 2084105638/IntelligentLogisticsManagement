@@ -55,15 +55,16 @@ export const getConsignorInfo = () => {
   return request.get<Result>('/consignor/info');
 };
 
-// 更新货主信息
-export interface ConsignorUpdateDTO {
+// 更新货主信息（对应后端 ConsignorChangeInfoDTO）
+export interface ConsignorChangeInfoDTO {
   email?: string;
   oldPassword?: string;
   newPassword?: string;
 }
 
-export const updateConsignorInfo = (data: ConsignorUpdateDTO) => {
-  return request.put<Result>('/consignor/update', data);
+// 修改货主个人信息（/consignor/changeInfo）
+export const changeConsignorInfo = (data: ConsignorChangeInfoDTO) => {
+  return request.post<Result>('/consignor/changeInfo', data);
 };
 
 // ============ 运单相关API ============
@@ -188,9 +189,8 @@ export const dispatcherGetWaybill = (waybillId: string) => {
 // ============ 车辆相关API ============
 export interface CarCreateDTO {
   driverId: number;
-  licensePlate: string;
-  carType: string;
-  loadCapacity: number;
+  // 车辆类型，对应后端枚举 CarType（0: 微型, 1: 轻型, 2: 中型, 3: 重型）
+  type: number;
   location?: string;
   status?: number;
 }
@@ -198,9 +198,8 @@ export interface CarCreateDTO {
 export interface CarUpdateDTO {
   carId: number;
   driverId?: number;
-  licensePlate?: string;
-  carType?: string;
-  loadCapacity?: number;
+  // 车辆类型，可选；后端若暂不支持会自动忽略
+  type?: number;
   location?: string;
   status?: number;
 }
@@ -217,9 +216,12 @@ export interface CarVO {
   carId: number;
   driverId: number;
   driverName?: string;
-  licensePlate: string;
-  carType: string;
-  loadCapacity: number;
+  // 车辆类型编码，对应后端枚举 CarType（0: 微型, 1: 轻型, 2: 中型, 3: 重型）
+  type?: number;
+  // 兼容旧字段：如果后端返回了车牌、车型、载重，这里保留但不强依赖
+  licensePlate?: string;
+  carType?: string;
+  loadCapacity?: number;
   location: string;
   status: number;
   statusDesc?: string;
@@ -266,6 +268,21 @@ export const getCarLocation = (carId: number) => {
 export const updateCarLocation = (carId: number, location: string) => {
   return request.put<Result>(`/dispatcher/cars/${carId}/location`, null, {
     params: { location },
+  });
+};
+
+// ============ 司机查询（用于调度员选择司机） ============
+export interface DriverOption {
+  driverId: number;
+  phone?: string;
+  email?: string;
+  name?: string;
+}
+
+// 按关键字查询司机（支持手机号/邮箱/姓名），需后端提供对应接口
+export const searchDrivers = (keyword: string) => {
+  return request.get<Result<DriverOption[]>>('/dispatcher/drivers', {
+    params: { keyword },
   });
 };
 
@@ -331,6 +348,26 @@ export interface DriverLoginVO {
   name: string;
 }
 
+// 司机查询 DTO（调度员侧查询司机列表）
+export interface DriverQueryDTO {
+  keyword?: string; // 可用于按手机号/姓名/账号模糊搜索
+  phone?: string;
+  name?: string;
+  current?: number;
+  size?: number;
+}
+
+// 司机信息 VO（用于下拉选择）
+export interface DriverVO {
+  driverId: number;
+  userId?: number;
+  username?: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  status?: number;
+}
+
 // 运单异常上报 DTO（与后端 WaybillExceptionReportDTO 对齐）
 export interface WaybillExceptionReportDTO {
   waybillIdentification: string; // 使用 waybillIdentification 作为业务标识
@@ -346,6 +383,11 @@ export const driverRegister = (data: DriverRegisterDTO) => {
 // 司机登录
 export const driverLogin = (data: DriverLoginDTO) => {
   return request.post<Result<DriverLoginVO>>('/driver/login', data);
+};
+
+// 调度员查询司机列表
+export const queryDriversForDispatcher = (data: DriverQueryDTO) => {
+  return request.post<Result<PageResult<DriverVO>>>('/dispatcher/drivers', data);
 };
 
 // 上报运单异常

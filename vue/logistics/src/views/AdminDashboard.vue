@@ -320,22 +320,43 @@ export default defineComponent({
       username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
       password: [
         {
-          required: false,
-          message: '请输入密码',
+          validator: (_: any, value: string, callback: (error?: Error) => void) => {
+            // 新增时必须填密码，编辑时可空
+            if (!isEdit.value && (!value || !value.trim())) {
+              callback(new Error('请输入密码'));
+            } else {
+              callback();
+            }
+          },
           trigger: 'blur',
         },
       ],
       phone: [
         {
-          pattern: /^1[3-9]\d{9}$/,
-          message: '请输入有效的手机号',
+          validator: (_: any, value: string, callback: (error?: Error) => void) => {
+            // 货主/司机必须提供手机号，调度员可选
+            if ((userForm.type === 1 || userForm.type === 3) && (!value || !/^1[3-9]\d{9}$/.test(value))) {
+              callback(new Error('请输入有效的手机号'));
+            } else {
+              callback();
+            }
+          },
           trigger: 'blur',
         },
       ],
       email: [
         {
-          type: 'email',
-          message: '请输入正确的邮箱格式',
+          validator: (_: any, value: string, callback: (error?: Error) => void) => {
+            // 货主/司机必须提供邮箱，调度员可选
+            const emailRequired = userForm.type === 1 || userForm.type === 3;
+            if (emailRequired && (!value || !/^[^@]+@[^@]+\.[^@]+$/.test(value))) {
+              callback(new Error('请输入正确的邮箱'));
+            } else if (value && !/^[^@]+@[^@]+\.[^@]+$/.test(value)) {
+              callback(new Error('请输入正确的邮箱'));
+            } else {
+              callback();
+            }
+          },
           trigger: 'blur',
         },
       ],
@@ -438,35 +459,41 @@ export default defineComponent({
 
     const submitUserForm = async () => {
       if (!userFormRef.value) return;
-      await userFormRef.value.validate(async (valid: boolean) => {
-        if (!valid) return;
-        try {
-          if (isEdit.value && userForm.userId) {
-            const dto: UserUpdateDTO = {
-              username: userForm.username,
-              email: userForm.email,
-              phone: userForm.phone,
-              password: userForm.password || undefined,
-            };
-            await updateUser(userForm.userId, dto);
-            ElMessage.success('用户信息更新成功');
-          } else {
-            const dto: UserCreateDTO = {
-              type: userForm.type,
-              username: userForm.username,
-              password: userForm.password,
-              email: userForm.email,
-              phone: userForm.phone,
-            };
-            await createUser(dto);
-            ElMessage.success('用户创建成功');
-          }
-          userDialogVisible.value = false;
-          loadUsers();
-        } catch (error: any) {
-          ElMessage.error(error.message || '保存失败');
+      try {
+        await userFormRef.value.validate();
+      } catch (e) {
+        ElMessage.warning('请先修正表单校验错误');
+        return;
+      }
+      try {
+        if (isEdit.value && userForm.userId) {
+          const dto: UserUpdateDTO = {
+            username: userForm.username,
+            email: userForm.email,
+            phone: userForm.phone,
+            password: userForm.password || undefined,
+          };
+          console.log('admin updateUser payload:', dto, 'userId:', userForm.userId);
+          await updateUser(userForm.userId, dto);
+          ElMessage.success('用户信息更新成功');
+        } else {
+          const dto: UserCreateDTO = {
+            type: userForm.type,
+            username: userForm.username,
+            password: userForm.password,
+            email: userForm.email,
+            phone: userForm.phone,
+          };
+          console.log('admin createUser payload:', dto);
+          await createUser(dto);
+          ElMessage.success('用户创建成功');
         }
-      });
+        userDialogVisible.value = false;
+        loadUsers();
+      } catch (error: any) {
+        console.error('admin create/update user error:', error);
+        ElMessage.error(error.message || '保存失败');
+      }
     };
 
     const toggleUserStatus = async (user: UserVO) => {
@@ -554,6 +581,7 @@ export default defineComponent({
       loadSystemStats,
       userDialogVisible,
       isEdit,
+      userFormRef,
       userForm,
       userFormRules,
       openCreateUserDialog,

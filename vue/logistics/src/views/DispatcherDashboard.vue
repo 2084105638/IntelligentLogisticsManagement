@@ -110,6 +110,11 @@
             </div>
               <el-table :data="carList" style="width: 100%; margin-top: 20px" v-loading="carLoading">
                 <el-table-column prop="carId" label="车辆ID" width="100" />
+                <el-table-column label="车型" width="140">
+                  <template #default="scope">
+                    {{ getCarTypeText(scope.row) }}
+                  </template>
+                </el-table-column>
                 <el-table-column label="司机" width="200">
                   <template #default="scope">
                     <div class="driver-cell">
@@ -268,22 +273,41 @@
       <el-form :model="carForm" :rules="carRules" ref="carFormRef" label-width="100px">
         <el-form-item label="司机" prop="driverId">
           <div class="driver-edit">
-            <el-input-number
+            <el-select
               v-model="carForm.driverId"
-              :min="1"
-              :controls="false"
+              filterable
+              remote
+              reserve-keyword
+              clearable
+              placeholder="请输入手机号/邮箱/姓名搜索司机"
+              :remote-method="remoteSearchDrivers"
+              :loading="driverLoading"
               style="width: 100%"
-              placeholder="填写要绑定的司机ID，可留空"
-            />
+            >
+              <el-option
+                v-for="item in driverOptions"
+                :key="item.driverId"
+                :label="formatDriverOption(item)"
+                :value="item.driverId"
+              />
+            </el-select>
             <div class="driver-edit-tip">
               <span v-if="carForm.carId">
                 当前司机：
                 <strong>{{ carForm.driverName || '未绑定' }}</strong>
                 <span v-if="carForm.driverId">（ID: {{ carForm.driverId }}）</span>
               </span>
-              <span v-else>新增车辆时可暂不绑定司机，后续在此处填写司机ID。</span>
+              <span v-else>可搜索司机并选择，若不绑定可留空。</span>
             </div>
           </div>
+        </el-form-item>
+        <el-form-item label="车型" prop="type">
+          <el-select v-model="carForm.type" placeholder="请选择车辆类型" style="width: 100%">
+            <el-option :value="0" label="微型" />
+            <el-option :value="1" label="轻型" />
+            <el-option :value="2" label="中型" />
+            <el-option :value="3" label="重型" />
+          </el-select>
         </el-form-item>
         <el-form-item label="位置">
           <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -344,6 +368,7 @@ import {
   createCar,
   updateCar,
   deleteCar as deleteCarAPI,
+  queryDriversForDispatcher,
   assignVehicle,
   autoAssignVehicle,
   getDispatcherInfo,
@@ -355,6 +380,8 @@ import {
   WaybillVO,
   CarVO,
   getCarLocation,
+  DriverVO,
+  DriverQueryDTO,
 } from '../api';
 import { clearAuth, getUserInfo } from '../utils/auth';
 import { getStatusDesc, getStatusType, getCarStatusDesc, getCarStatusType } from '../utils/waybillStatus';
@@ -369,6 +396,8 @@ export default defineComponent({
     const carLoading = ref(false);
     const waybillList = ref<WaybillVO[]>([]);
     const carList = ref<CarVO[]>([]);
+    const driverOptions = ref<Array<DriverVO & { driverId?: number }>>([]);
+    const driverLoading = ref(false);
     const availableCars = ref<CarVO[]>([]);
     const waybillPage = ref(1);
     const waybillPageSize = ref(10);
@@ -405,15 +434,17 @@ export default defineComponent({
       carId: null,
     });
 
-    const carForm = reactive<Partial<CarCreateDTO> & { carId?: number; driverName?: string }>({
-      driverId: 0,
+    const carForm = reactive<{ driverId: number | null; type: number | null } & Partial<Omit<CarCreateDTO, 'driverId' | 'type'>> & { carId?: number; driverName?: string }>({
+      driverId: null,
+      type: null,
       location: '',
       status: 0,
       driverName: '',
     });
 
     const carRules = {
-      driverId: [{ required: true, message: '请输入司机ID', trigger: 'blur' }],
+      driverId: [{ required: true, message: '请选择司机', trigger: 'change' }],
+      type: [{ required: true, message: '请选择车辆类型', trigger: 'change' }],
     };
 
     const statistics = reactive({
@@ -437,12 +468,44 @@ export default defineComponent({
       loadUserInfo();
       loadWaybills();
       loadCars();
+      loadDrivers();
       loadStatistics();
       // 延迟加载地图，确保DOM已渲染
       setTimeout(() => {
         initMap();
       }, 500);
     });
+
+    // 查询司机列表（全部或按关键字），使用调度员权限接口
+    const loadDrivers = async (keyword = '') => {
+      try {
+        driverLoading.value = true;
+        const params: DriverQueryDTO = { current: 1, size: 500 };
+        if (keyword) params.keyword = keyword;
+        const result = await queryDriversForDispatcher(params);
+        const pageData = result.data as any;
+        const records = (pageData.records || []) as DriverVO[];
+        driverOptions.value = records.map((d) => ({
+          ...d,
+          driverId: d.driverId || (d as any).userId,
+        }));
+      } catch (error: any) {
+        console.warn('加载司机列表失败（仅影响选择司机）：', error?.message || error);
+      } finally {
+        driverLoading.value = false;
+      }
+    };
+
+    const remoteSearchDrivers = (query: string) => {
+      loadDrivers(query);
+    };
+
+    const formatDriverOption = (item: DriverVO & { driverId?: number }) => {
+      const id = item.driverId || (item as any).userId;
+      const name = (item as any).name || (item as any).username || '无用户名';
+      const phone = item.phone ? ` / ${item.phone}` : '';
+      return `ID:${id} / ${name}${phone}`;
+    };
 
     const loadUserInfo = async () => {
       try {
@@ -675,6 +738,7 @@ export default defineComponent({
     };
 
     const showCarDialog = () => {
+      loadDrivers();
       carDialogTitle.value = '新增车辆';
       Object.keys(carForm).forEach((key) => {
         if (key === 'carId') {
@@ -682,7 +746,7 @@ export default defineComponent({
         } else if (key === 'status') {
           (carForm as any)[key] = 0;
         } else {
-          (carForm as any)[key] = '';
+          (carForm as any)[key] = key === 'driverId' ? null : '';
         }
       });
       carLocationName.value = '';
@@ -691,12 +755,12 @@ export default defineComponent({
     };
 
     const editCar = (row: CarVO) => {
+      loadDrivers();
       carDialogTitle.value = '编辑车辆';
       carForm.carId = row.carId;
-      carForm.licensePlate = row.licensePlate;
-      carForm.carType = row.carType;
-      carForm.loadCapacity = row.loadCapacity;
       carForm.driverId = row.driverId;
+      // 如果后端返回了类型编码，带入表单；否则置为空
+      carForm.type = (row as any).type ?? null;
       carForm.driverName = row.driverName || '';
       carForm.location = row.location;
       carForm.status = row.status;
@@ -921,7 +985,8 @@ export default defineComponent({
             if (carForm.carId) {
               const updateData: CarUpdateDTO = {
                 carId: carForm.carId,
-                driverId: carForm.driverId,
+                driverId: carForm.driverId ?? 0,
+                type: carForm.type ?? undefined,
                 location: carForm.location,
                 status: carForm.status,
               };
@@ -930,9 +995,7 @@ export default defineComponent({
             } else {
               const createData: CarCreateDTO = {
                 driverId: carForm.driverId ?? 0,
-                licensePlate: carForm.licensePlate || '',
-                carType: carForm.carType || '',
-                loadCapacity: carForm.loadCapacity ?? 0,
+                type: carForm.type ?? 0,
                 location: carForm.location || '',
                 status: carForm.status ?? 0,
               };
@@ -1409,6 +1472,19 @@ export default defineComponent({
       }
     };
 
+    // 车辆类型文案映射：优先使用后端 type 枚举，其次兼容旧字段 carType
+    const getCarTypeText = (car: CarVO & { type?: number }) => {
+      const code = (car as any).type;
+      if (code === 0) return '微型';
+      if (code === 1) return '轻型';
+      if (code === 2) return '中型';
+      if (code === 3) return '重型';
+      if ((car as any).carType) {
+        return (car as any).carType;
+      }
+      return '未知';
+    };
+
     return {
       activeTab,
       loading,
@@ -1448,6 +1524,11 @@ export default defineComponent({
       saveCar,
       deleteCar,
       releaseCar,
+      getCarTypeText,
+      driverOptions,
+      driverLoading,
+      remoteSearchDrivers,
+      formatDriverOption,
       handleLogout,
       getStatusDesc,
       getStatusType,

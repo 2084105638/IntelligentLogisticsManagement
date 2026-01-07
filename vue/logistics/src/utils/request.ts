@@ -27,7 +27,7 @@ const service: AxiosInstance = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 从localStorage获取token
+    // 从 localStorage 获取 token，后端不需要 Bearer 前缀，保持原样
     const token = localStorage.getItem('token');
     if (token && config.headers) {
       config.headers.Authorization = token;

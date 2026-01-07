@@ -62,6 +62,9 @@ public class CarServiceImpl implements CarService {
         if (dto.getType() != null) {
             car.setType(dto.getType());
         }
+        if (dto.getType() != null){
+            car.setType(dto.getType());
+        }
         carDao.updateById(car);
     }
     

@@ -34,10 +34,44 @@
                   />
                 </el-form-item>
                 <el-form-item label="发货地址" prop="startAddress">
-                  <el-input v-model="waybillForm.startAddress" placeholder="请输入提货地址" />
+                  <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                    <div style="display: flex; gap: 8px;">
+                      <el-input
+                        v-model="waybillForm.startAddress"
+                        placeholder="请通过地图选择发货位置"
+                        readonly
+                      />
+                      <el-button type="primary" plain @click="openLocationPicker('start')">地图选择</el-button>
+                    </div>
+                    <div v-if="startPickedLocationText || startPickedAddressText" style="font-size: 12px; color: #909399;">
+                      <div v-if="startPickedLocationText">
+                        经纬度：{{ startPickedLocationText }}
+                      </div>
+                      <div v-if="startPickedAddressText" style="color: #67c23a;">
+                        解析地址：{{ startPickedAddressText }}
+                      </div>
+                    </div>
+                  </div>
                 </el-form-item>
                 <el-form-item label="收货地址" prop="endAddress">
-                  <el-input v-model="waybillForm.endAddress" placeholder="请输入送货地址" />
+                  <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+                    <div style="display: flex; gap: 8px;">
+                      <el-input
+                        v-model="waybillForm.endAddress"
+                        placeholder="请通过地图选择收货位置"
+                        readonly
+                      />
+                      <el-button type="primary" plain @click="openLocationPicker('end')">地图选择</el-button>
+                    </div>
+                    <div v-if="endPickedLocationText || endPickedAddressText" style="font-size: 12px; color: #909399;">
+                      <div v-if="endPickedLocationText">
+                        经纬度：{{ endPickedLocationText }}
+                      </div>
+                      <div v-if="endPickedAddressText" style="color: #67c23a;">
+                        解析地址：{{ endPickedAddressText }}
+                      </div>
+                    </div>
+                  </div>
                 </el-form-item>
                 <el-form-item label="期望时效" prop="expectedTimeLimit">
                   <el-date-picker
@@ -226,11 +260,28 @@
         <el-descriptions-item label="创建时间">{{ currentWaybill.createTime }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
+
+    <!-- 地址选择地图对话框 -->
+    <el-dialog v-model="locationPickerVisible" :title="locationPickerTitle" width="800px">
+      <div id="addressMapContainer" style="height: 480px; width: 100%; border-radius: 8px; overflow: hidden;"></div>
+      <div style="margin-top: 10px; font-size: 13px; color: #909399;">
+        在地图上点击选择位置，将使用该点的经纬度作为地址（格式：纬度,经度）。
+        <div v-if="pickedLocationText" style="margin-top: 4px; color: #409eff;">
+          当前选择：{{ pickedLocationText }}
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="locationPickerVisible = false">取 消</el-button>
+          <el-button type="primary" @click="confirmLocationPick">确 定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, onMounted } from 'vue';
+import { defineComponent, reactive, ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
@@ -239,7 +290,8 @@ import {
   getWaybillDetail,
   cancelWaybill as cancelWaybillAPI,
   getConsignorInfo,
-  updateConsignorInfo,
+  changeConsignorInfo,
+  ConsignorChangeInfoDTO,
   WaybillCreateDTO,
   WaybillVO,
 } from '../api';
@@ -338,6 +390,24 @@ export default defineComponent({
       cost: 0,
     });
 
+    // 地址选择地图相关（发货/收货地址）
+    const locationPickerVisible = ref(false);
+    const locationPickerTitle = ref('选择地址');
+    const locationPickerTarget = ref<'start' | 'end'>('start');
+    let addressMapInstance: any = null;
+    let addressMarker: any = null;
+    const pickedLat = ref<number | null>(null);
+    const pickedLng = ref<number | null>(null);
+    const pickedLocationText = computed(() => {
+      if (pickedLat.value == null || pickedLng.value == null) return '';
+      return `${pickedLat.value.toFixed(6)},${pickedLng.value.toFixed(6)}`;
+    });
+    const pickedAddressText = ref('');
+    const startPickedLocationText = ref('');
+    const startPickedAddressText = ref('');
+    const endPickedLocationText = ref('');
+    const endPickedAddressText = ref('');
+
     const waybillRules = {
       goodsInformation: [{ required: true, message: '请输入货物信息', trigger: 'blur' }],
       startAddress: [{ required: true, message: '请输入发货地址', trigger: 'blur' }],
@@ -403,6 +473,137 @@ export default defineComponent({
           }, 100);
         }
       }
+    };
+
+    // 打开地址选择地图对话框
+    const openLocationPicker = (target: 'start' | 'end') => {
+      locationPickerTarget.value = target;
+      locationPickerTitle.value = target === 'start' ? '选择发货地址' : '选择收货地址';
+      pickedLat.value = null;
+      pickedLng.value = null;
+      pickedAddressText.value = '';
+      locationPickerVisible.value = true;
+
+      // 等待对话框渲染完成再初始化地图
+      setTimeout(() => {
+        initAddressMap();
+      }, 300);
+    };
+
+    const initAddressMap = () => {
+      const container = document.getElementById('addressMapContainer');
+      if (!container) {
+        console.warn('地址选择地图容器不存在');
+        return;
+      }
+
+      const apiKey = String(AMAP_API_KEY);
+      if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
+        ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
+        return;
+      }
+
+      if (typeof (window as any).AMap === 'undefined') {
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&callback=initOwnerAddressAMap`;
+        script.async = true;
+        (window as any).initOwnerAddressAMap = () => {
+          createAddressMapInstance();
+        };
+        document.head.appendChild(script);
+      } else {
+        createAddressMapInstance();
+      }
+    };
+
+    const createAddressMapInstance = () => {
+      const container = document.getElementById('addressMapContainer');
+      if (!container) return;
+
+      try {
+        // 如果已有实例，先销毁
+        if (addressMapInstance) {
+          addressMapInstance.destroy();
+          addressMapInstance = null;
+          addressMarker = null;
+        }
+
+        addressMapInstance = new (window as any).AMap.Map('addressMapContainer', {
+          zoom: 12,
+          center: DEFAULT_MAP_CENTER,
+        });
+
+        // 点击地图选择位置
+        addressMapInstance.on('click', (e: any) => {
+          const lng = e.lnglat.getLng();
+          const lat = e.lnglat.getLat();
+          pickedLat.value = lat;
+          pickedLng.value = lng;
+
+          // 清除旧标记
+          if (addressMarker) {
+            addressMapInstance.remove(addressMarker);
+          }
+          addressMarker = new (window as any).AMap.Marker({
+            position: [lng, lat],
+            draggable: true,
+          });
+          addressMarker.setMap(addressMapInstance);
+
+          // 拖动更新坐标
+          addressMarker.on('dragend', () => {
+            const pos = addressMarker.getPosition();
+            pickedLat.value = pos.getLat();
+            pickedLng.value = pos.getLng();
+            reverseGeocodeLatLng(pickedLat.value, pickedLng.value);
+          });
+
+          // 选点后立即反向地理编码得到人类可读地址
+          reverseGeocodeLatLng(lat, lng);
+        });
+      } catch (error) {
+        console.error('地址选择地图初始化失败:', error);
+        ElMessage.warning('地址选择地图初始化失败，请检查高德地图API配置');
+      }
+    };
+
+    // 调用高德逆地理编码，将经纬度解析为具体地址
+    const reverseGeocodeLatLng = async (lat: number | null, lng: number | null) => {
+      if (lat == null || lng == null) return;
+      try {
+        const apiKey = String(AMAP_API_KEY);
+        const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.status === '1' && data.regeocode && data.regeocode.formatted_address) {
+          pickedAddressText.value = data.regeocode.formatted_address;
+        } else {
+          pickedAddressText.value = '';
+        }
+      } catch (err) {
+        console.error('地址反向地理编码失败:', err);
+        pickedAddressText.value = '';
+      }
+    };
+
+    const confirmLocationPick = () => {
+      if (pickedLat.value == null || pickedLng.value == null) {
+        ElMessage.warning('请先在地图上点击选择一个位置');
+        return;
+      }
+      const coordText = `${pickedLat.value},${pickedLng.value}`;
+      const finalAddress = pickedAddressText.value || coordText;
+      if (locationPickerTarget.value === 'start') {
+        waybillForm.startAddress = finalAddress;
+        startPickedLocationText.value = coordText;
+        startPickedAddressText.value = pickedAddressText.value;
+      } else {
+        waybillForm.endAddress = finalAddress;
+        endPickedLocationText.value = coordText;
+        endPickedAddressText.value = pickedAddressText.value;
+      }
+      locationPickerVisible.value = false;
     };
 
     const handleCreateWaybill = async () => {
@@ -547,7 +748,7 @@ export default defineComponent({
         updating.value = true;
 
         // 构建更新数据
-        const updateData: any = {
+        const updateData: ConsignorChangeInfoDTO = {
           email: profileForm.email,
         };
 
@@ -557,8 +758,8 @@ export default defineComponent({
           updateData.newPassword = profileForm.newPassword;
         }
 
-        // 调用更新API
-        await updateConsignorInfo(updateData);
+        // 调用更新API（使用 /consignor/changeInfo）
+        await changeConsignorInfo(updateData);
 
         ElMessage.success('个人信息更新成功');
         
@@ -995,6 +1196,12 @@ export default defineComponent({
       refreshOwnerMap,
       onWaybillSelectChange,
       showAllWaybills,
+      // 地址选择地图相关
+      locationPickerVisible,
+      locationPickerTitle,
+      pickedLocationText,
+      openLocationPicker,
+      confirmLocationPick,
     };
   },
 });
