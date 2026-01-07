@@ -12,6 +12,9 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum WaybillStatus {
+    /**
+     * 订单状态
+     */
 
     PENDING_ALLOCATION(0, "待分配"),
     ALLOCATED(1, "已分配"),
