@@ -1,20 +1,29 @@
 <template>
   <div class="dashboard">
-    <el-container>
-      <el-header>
+    <div class="dashboard-bg"></div>
+    <el-container class="dashboard-shell">
+      <el-header class="dashboard-header">
         <div class="header-content">
-          <h2>货主工作台</h2>
+          <div class="header-left">
+            <div class="logo">
+              <span class="logo-dot" />
+              <div class="logo-text">
+                <span class="logo-title">货主工作台</span>
+                <span class="logo-subtitle">下单 · 跟踪 · 签收，一站式管理您的运单</span>
+              </div>
+            </div>
+          </div>
           <div class="user-info">
-            <span>{{ userInfo?.phone || '货主' }}</span>
-            <el-button type="text" @click="handleLogout">退出登录</el-button>
+            <span class="user-name">{{ userInfo?.phone || '货主' }}</span>
+            <el-button link @click="handleLogout">退出登录</el-button>
           </div>
         </div>
       </el-header>
-      <el-main>
-        <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+      <el-main class="dashboard-main">
+        <el-tabs v-model="activeTab" @tab-change="handleTabChange" class="dashboard-tabs">
           <!-- 发布运单 -->
           <el-tab-pane label="发布运单" name="create">
-            <el-card>
+            <el-card class="panel-card">
               <el-form :model="waybillForm" :rules="waybillRules" ref="waybillFormRef" label-width="120px">
                 <el-form-item label="货物信息" prop="goodsInformation">
                   <el-input
@@ -69,7 +78,7 @@
 
           <!-- 运单追踪 -->
           <el-tab-pane label="运单追踪" name="track">
-            <el-card>
+            <el-card class="panel-card">
               <div class="search-bar">
                 <el-select v-model="queryStatus" placeholder="按状态筛选" clearable style="width: 150px">
                   <el-option label="待分配" :value="0" />
@@ -134,20 +143,26 @@
 
           <!-- 实时追踪 -->
           <el-tab-pane label="实时追踪" name="realtime">
-            <el-card>
-              <div class="map-container" id="mapContainer" style="height: 600px">
-                <div style="text-align: center; padding-top: 250px; color: #999">
-                  地图功能需要集成高德地图或百度地图API
-                  <br />
-                  请配置地图API密钥后使用
-                </div>
+            <el-card class="panel-card">
+              <div class="map-controls" style="margin-bottom: 15px">
+                <el-select v-model="selectedWaybillId" placeholder="选择运单" clearable style="width: 200px" @change="onWaybillSelectChange">
+                  <el-option
+                    v-for="waybill in waybillList"
+                    :key="waybill.waybillId"
+                    :label="`运单${waybill.waybillId} - ${waybill.goodsInformation}`"
+                    :value="waybill.waybillId"
+                  />
+                </el-select>
+                <el-button type="primary" @click="refreshOwnerMap" style="margin-left: 10px">刷新位置</el-button>
+                <el-button @click="showAllWaybills" style="margin-left: 10px">显示全部运单</el-button>
               </div>
+              <div class="map-container" id="mapContainer" style="height: 600px"></div>
             </el-card>
           </el-tab-pane>
 
           <!-- 个人信息 -->
           <el-tab-pane label="个人信息" name="profile">
-            <el-card>
+            <el-card class="panel-card">
               <el-form :model="profileForm" label-width="120px">
                 <el-form-item label="手机号">
                   <el-input v-model="profileForm.phone" disabled />
@@ -202,6 +217,7 @@ import {
 } from '../api';
 import { clearAuth, getUserInfo } from '../utils/auth';
 import { getStatusDesc, getStatusType } from '../utils/waybillStatus';
+import { AMAP_API_KEY, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from '../config/map';
 
 export default defineComponent({
   name: 'OwnerDashboard',
@@ -242,11 +258,20 @@ export default defineComponent({
       receivingConsignorId: [{ required: true, message: '请输入收货人ID', trigger: 'blur' }],
     };
 
+    // 地图相关
+    const selectedWaybillId = ref<string | null>(null);
+    let ownerMapInstance: any = null;
+    let ownerMarkers: any[] = [];
+
     onMounted(() => {
       loadUserInfo();
       if (activeTab.value === 'track') {
         loadWaybills();
       }
+      // 延迟加载地图
+      setTimeout(() => {
+        initOwnerMap();
+      }, 500);
     });
 
     const loadUserInfo = async () => {
@@ -267,6 +292,27 @@ export default defineComponent({
     const handleTabChange = (tab: string) => {
       if (tab === 'track') {
         loadWaybills();
+      } else if (tab === 'realtime') {
+        // 切换到地图标签页时，确保运单数据已加载，然后初始化地图并加载运单位置
+        if (waybillList.value.length === 0) {
+          loadWaybills().then(() => {
+            setTimeout(() => {
+              if (!ownerMapInstance) {
+                initOwnerMap();
+              } else {
+                refreshOwnerMap();
+              }
+            }, 300);
+          });
+        } else {
+          setTimeout(() => {
+            if (!ownerMapInstance) {
+              initOwnerMap();
+            } else {
+              refreshOwnerMap();
+            }
+          }, 100);
+        }
       }
     };
 
@@ -306,8 +352,45 @@ export default defineComponent({
         const result = await queryWaybillsByStatus(queryStatus.value, currentPage.value, pageSize.value);
         if (result.data) {
           const pageData = result.data as any;
-          waybillList.value = pageData.records || [];
-          total.value = pageData.total || 0;
+          const records: any[] = pageData.records || [];
+          // 1) 过滤掉明确标记为 changed=1 的旧单
+          const filtered = records.filter((w) => w.changed === 0 || w.changed === undefined);
+          // 2) 按业务字段去重（同一运单被复制时，这些字段是一致的），保留“最新且状态优先”的一条
+          const dedupMap = new Map<string, any>();
+          filtered.forEach((w) => {
+            const key = [
+              w.goodsInformation,
+              w.startAddress,
+              w.endAddress,
+              w.expectedTimeLimit,
+              w.cost,
+            ].join('|');
+            const prev = dedupMap.get(key);
+            if (!prev) {
+              dedupMap.set(key, w);
+              return;
+            }
+            // 优先级：已分配/运输中/已完成 > 待分配；同优先级取创建时间更晚的一条
+            const statusPriority = (s: number) => {
+              if (s === 1 || s === 2 || s === 3) return 2;
+              return 1;
+            };
+            const prevPri = statusPriority(prev.status);
+            const curPri = statusPriority(w.status);
+            if (curPri > prevPri) {
+              dedupMap.set(key, w);
+              return;
+            }
+            if (curPri === prevPri) {
+              const prevTime = new Date(prev.createTime).getTime();
+              const curTime = new Date(w.createTime).getTime();
+              if (curTime >= prevTime) {
+                dedupMap.set(key, w);
+              }
+            }
+          });
+          waybillList.value = Array.from(dedupMap.values());
+          total.value = waybillList.value.length;
         }
       } catch (error: any) {
         ElMessage.error(error.message || '加载运单列表失败');
@@ -328,7 +411,7 @@ export default defineComponent({
       }
     };
 
-    const cancelWaybill = async (waybillId: number) => {
+    const cancelWaybill = async (waybillId: string) => {
       try {
         await ElMessageBox.confirm('确定要取消该运单吗？', '提示', {
           confirmButtonText: '确定',
@@ -361,6 +444,376 @@ export default defineComponent({
 
     const updateProfile = () => {
       ElMessage.info('个人信息更新功能待实现');
+    };
+
+    // 初始化地图
+    const initOwnerMap = () => {
+      const container = document.getElementById('mapContainer');
+      if (!container) {
+        console.warn('地图容器不存在');
+        return;
+      }
+
+      // 检查是否已加载高德地图API
+      if (typeof (window as any).AMap === 'undefined') {
+        const apiKey = String(AMAP_API_KEY);
+        if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
+          ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
+          return;
+        }
+        // 动态加载高德地图API（包含地理编码服务）
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geocoder&callback=initOwnerAMap`;
+        script.async = true;
+        (window as any).initOwnerAMap = () => {
+          createOwnerMapInstance();
+        };
+        document.head.appendChild(script);
+      } else {
+        createOwnerMapInstance();
+      }
+    };
+
+    // 创建地图实例
+    const createOwnerMapInstance = () => {
+      const container = document.getElementById('mapContainer');
+      if (!container) return;
+
+      try {
+        ownerMapInstance = new (window as any).AMap.Map('mapContainer', {
+          zoom: DEFAULT_MAP_ZOOM,
+          center: DEFAULT_MAP_CENTER,
+        });
+        refreshOwnerMap();
+      } catch (error) {
+        console.error('地图初始化失败:', error);
+        ElMessage.warning('地图初始化失败，请检查高德地图API配置');
+      }
+    };
+
+    // 常见地址的坐标映射（长春市）
+    const addressMap: Record<string, [number, number]> = {
+      '长春': [125.323544, 43.817071],
+      '长春市': [125.323544, 43.817071],
+      '长春工业大学': [125.2875, 43.8964],
+      '长春工业大学北湖西区': [125.2875, 43.8964],
+      '长春工业大学北湖校区': [125.2875, 43.8964],
+      '吉林大学': [125.2985, 43.8844],
+      '吉林大学前卫校区': [125.2985, 43.8844],
+      '宽城': [125.3200, 43.9000],
+      '宽城区': [125.3200, 43.9000],
+      '南关': [125.3300, 43.8600],
+      '南关区': [125.3300, 43.8600],
+      '朝阳': [125.3000, 43.8300],
+      '朝阳区': [125.3000, 43.8300],
+      '绿园': [125.2500, 43.8800],
+      '绿园区': [125.2500, 43.8800],
+      '二道': [125.3800, 43.8700],
+      '二道区': [125.3800, 43.8700],
+      '双阳': [125.6500, 43.5200],
+      '双阳区': [125.6500, 43.5200],
+      '净月': [125.4500, 43.8000],
+      '净月区': [125.4500, 43.8000],
+      '净月潭': [125.4500, 43.8000],
+      '长春站': [125.3235, 43.9065],
+      '长春火车站': [125.3235, 43.9065],
+      '长春西站': [125.2000, 43.8500],
+      '龙嘉机场': [125.7000, 44.0000],
+      '长春龙嘉国际机场': [125.7000, 44.0000],
+      '人民广场': [125.3200, 43.8900],
+      '文化广场': [125.3100, 43.8800],
+      '南湖公园': [125.3000, 43.8500],
+      '伪满皇宫': [125.3500, 43.9200],
+      '长影世纪城': [125.4500, 43.7800],
+      '欧亚卖场': [125.2500, 43.8600],
+      '红旗街': [125.2900, 43.8700],
+      '重庆路': [125.3200, 43.8900],
+      '桂林路': [125.3100, 43.8700],
+      '汽车厂': [125.2200, 43.8500],
+      '一汽': [125.2200, 43.8500],
+      '一汽大众': [125.2200, 43.8500],
+    };
+
+    // 地理编码：将地址转换为坐标（使用高德地图Web服务API）
+    const geocodeAddress = (address: string): Promise<[number, number] | null> => {
+      return new Promise((resolve) => {
+        try {
+          if (!address) {
+            resolve(null);
+            return;
+          }
+
+          // 1. 先检查地址映射
+          const trimmedAddress = address.trim();
+          if (addressMap[trimmedAddress]) {
+            console.log(`使用地址映射: ${trimmedAddress} -> [${addressMap[trimmedAddress][0]}, ${addressMap[trimmedAddress][1]}]`);
+            resolve(addressMap[trimmedAddress]);
+            return;
+          }
+
+          // 2. 尝试解析坐标格式 \"lat,lng\"
+          const coordMatch = address.match(/([\\d.]+),\\s*([\\d.]+)/);
+          if (coordMatch) {
+            resolve([parseFloat(coordMatch[2]), parseFloat(coordMatch[1])]); // [lng, lat]
+            return;
+          }
+
+          // 使用高德地图Web服务API进行地理编码（更可靠）
+          const apiKey = String(AMAP_API_KEY);
+          const encodedAddress = encodeURIComponent(address);
+          const url = `https://restapi.amap.com/v3/geocode/geo?key=${apiKey}&address=${encodedAddress}&city=长春市`;
+          
+          // 添加超时处理（15秒）
+          const timeout = setTimeout(() => {
+            console.warn(`地理编码超时: ${address}`);
+            resolve(null);
+          }, 15000);
+
+          fetch(url)
+            .then(response => response.json())
+            .then(data => {
+              clearTimeout(timeout);
+              if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
+                const location = data.geocodes[0].location.split(',');
+                const lng = parseFloat(location[0]);
+                const lat = parseFloat(location[1]);
+                console.log(`地理编码成功: ${address} -> [${lng}, ${lat}]`);
+                resolve([lng, lat]);
+              } else {
+                console.warn(`地理编码失败: ${address}`, data);
+                resolve(null);
+              }
+            })
+            .catch(error => {
+              clearTimeout(timeout);
+              console.error(`地理编码请求失败: ${address}`, error);
+              // 如果Web API失败，尝试使用JS API
+              tryGeocodeWithJSAPI(address, resolve);
+            });
+        } catch (err) {
+          console.error(`地理编码处理异常: ${address}`, err);
+          resolve(null);
+        }
+      });
+    };
+
+    // 备用方案：使用JS API进行地理编码
+    const tryGeocodeWithJSAPI = (address: string, resolve: (value: [number, number] | null) => void) => {
+      if (typeof (window as any).AMap === 'undefined') {
+        resolve(null);
+        return;
+      }
+
+      const AMap = (window as any).AMap;
+      const timeout = setTimeout(() => {
+        resolve(null);
+      }, 10000);
+
+      // 检查 Geocoder 是否已加载
+      if (AMap.Geocoder) {
+        try {
+          const geocoder = new AMap.Geocoder({
+            city: '长春市',
+          });
+          geocoder.getLocation(address, (status: string, result: any) => {
+            clearTimeout(timeout);
+            if (status === 'complete' && result.geocodes && result.geocodes.length > 0) {
+              const location = result.geocodes[0].location;
+              console.log(`地理编码成功(JS API): ${address} -> [${location.lng}, ${location.lat}]`);
+              resolve([location.lng, location.lat]);
+            } else {
+              console.warn(`地理编码失败(JS API): ${address}`, status);
+              resolve(null);
+            }
+          });
+        } catch (err) {
+          clearTimeout(timeout);
+          console.error(`地理编码异常(JS API): ${address}`, err);
+          resolve(null);
+        }
+      } else {
+        // 如果未加载，通过插件方式异步加载
+        AMap.plugin('AMap.Geocoder', () => {
+          try {
+            const geocoder = new AMap.Geocoder({
+              city: '长春市',
+            });
+            geocoder.getLocation(address, (status: string, result: any) => {
+              clearTimeout(timeout);
+              if (status === 'complete' && result.geocodes && result.geocodes.length > 0) {
+                const location = result.geocodes[0].location;
+                console.log(`地理编码成功(JS API): ${address} -> [${location.lng}, ${location.lat}]`);
+                resolve([location.lng, location.lat]);
+              } else {
+                console.warn(`地理编码失败(JS API): ${address}`, status);
+                resolve(null);
+              }
+            });
+          } catch (err) {
+            clearTimeout(timeout);
+            console.error(`地理编码异常(JS API): ${address}`, err);
+            resolve(null);
+          }
+        });
+      }
+    };
+
+    // 刷新地图上的运单位置
+    const refreshOwnerMap = async () => {
+      if (!ownerMapInstance) {
+        console.log('地图实例不存在，正在初始化...');
+        initOwnerMap();
+        // 等待地图初始化完成
+        setTimeout(() => {
+          if (ownerMapInstance) {
+            refreshOwnerMap();
+          }
+        }, 1000);
+        return;
+      }
+
+      // 清除现有标记
+      ownerMarkers.forEach(marker => {
+        ownerMapInstance.remove(marker);
+      });
+      ownerMarkers = [];
+
+      try {
+        // 检查运单列表是否已加载
+        if (waybillList.value.length === 0) {
+          console.log('运单列表为空，正在加载...');
+          await loadWaybills();
+        }
+
+        // 获取要显示的运单
+        const waybillsToShow = selectedWaybillId.value
+          ? waybillList.value.filter(w => w.waybillId === selectedWaybillId.value)
+          : waybillList.value.filter(w => w.status === 1 || w.status === 2); // 只显示已分配或运输中的运单
+
+        console.log(`准备显示 ${waybillsToShow.length} 个运单`);
+
+        if (waybillsToShow.length === 0) {
+          ElMessage.info('当前没有可追踪的运单（只显示已分配或运输中的运单）');
+          return;
+        }
+
+        // 统计信息
+        let successCount = 0;
+        let failCount = 0;
+        const failedAddresses: string[] = [];
+
+        for (const waybill of waybillsToShow) {
+          console.log(`处理运单 ${waybill.waybillId}: ${waybill.startAddress} -> ${waybill.endAddress}`);
+          
+          // 显示起点
+          const startCoords = await geocodeAddress(waybill.startAddress);
+          if (startCoords) {
+            try {
+              const startMarker = new (window as any).AMap.Marker({
+                position: startCoords,
+                title: `起点: ${waybill.startAddress}`,
+                icon: new (window as any).AMap.Icon({
+                  size: new (window as any).AMap.Size(32, 32),
+                  image: 'https://webapi.amap.com/theme/v1.3/markers/n/start.png',
+                }),
+                label: {
+                  content: '起点',
+                  direction: 'right',
+                },
+              });
+              startMarker.setMap(ownerMapInstance);
+              ownerMarkers.push(startMarker);
+              console.log(`起点标记已添加: ${waybill.startAddress} -> [${startCoords[0]}, ${startCoords[1]}]`);
+            } catch (err) {
+              console.error(`创建起点标记失败: ${waybill.startAddress}`, err);
+              failCount++;
+            }
+          } else {
+            console.warn(`起点地址无法解析: ${waybill.startAddress}`);
+            failedAddresses.push(`起点: ${waybill.startAddress}`);
+            failCount++;
+          }
+
+          // 显示终点
+          const endCoords = await geocodeAddress(waybill.endAddress);
+          if (endCoords) {
+            try {
+              const endMarker = new (window as any).AMap.Marker({
+                position: endCoords,
+                title: `终点: ${waybill.endAddress}`,
+                icon: new (window as any).AMap.Icon({
+                  size: new (window as any).AMap.Size(32, 32),
+                  image: 'https://webapi.amap.com/theme/v1.3/markers/n/end.png',
+                }),
+                label: {
+                  content: '终点',
+                  direction: 'right',
+                },
+              });
+              endMarker.setMap(ownerMapInstance);
+              ownerMarkers.push(endMarker);
+              console.log(`终点标记已添加: ${waybill.endAddress} -> [${endCoords[0]}, ${endCoords[1]}]`);
+            } catch (err) {
+              console.error(`创建终点标记失败: ${waybill.endAddress}`, err);
+              failCount++;
+            }
+          } else {
+            console.warn(`终点地址无法解析: ${waybill.endAddress}`);
+            failedAddresses.push(`终点: ${waybill.endAddress}`);
+            failCount++;
+          }
+
+          // 如果有起点和终点，绘制路线
+          if (startCoords && endCoords) {
+            try {
+              const polyline = new (window as any).AMap.Polyline({
+                path: [startCoords, endCoords],
+                strokeColor: '#3366FF',
+                strokeWeight: 3,
+                strokeStyle: 'solid',
+              });
+              polyline.setMap(ownerMapInstance);
+              ownerMarkers.push(polyline);
+              successCount++;
+              console.log(`路线已绘制: ${waybill.startAddress} -> ${waybill.endAddress}`);
+            } catch (err) {
+              console.error(`绘制路线失败:`, err);
+            }
+          }
+        }
+
+        // 如果有标记，调整地图视野
+        if (ownerMarkers.length > 0) {
+          ownerMapInstance.setFitView(ownerMarkers);
+          console.log(`成功显示 ${ownerMarkers.length} 个标记`);
+          if (failCount > 0) {
+            ElMessage.warning(`成功显示 ${successCount} 个运单，${failCount} 个地址解析失败`);
+          } else {
+            ElMessage.success(`成功显示 ${successCount} 个运单的位置`);
+          }
+        } else {
+          ElMessage.warning('没有运单位置可以显示在地图上。请检查运单地址是否正确');
+          console.warn('没有可显示的运单位置', {
+            totalWaybills: waybillsToShow.length,
+            failedAddresses,
+          });
+        }
+      } catch (error: any) {
+        console.error('刷新地图异常:', error);
+        ElMessage.error('刷新地图失败: ' + (error.message || '未知错误'));
+      }
+    };
+
+    // 运单选择变化
+    const onWaybillSelectChange = () => {
+      refreshOwnerMap();
+    };
+
+    // 显示全部运单
+    const showAllWaybills = () => {
+      selectedWaybillId.value = null;
+      refreshOwnerMap();
     };
 
     const handleLogout = async () => {
@@ -400,6 +853,10 @@ export default defineComponent({
       handleLogout,
       getStatusDesc,
       getStatusType,
+      selectedWaybillId,
+      refreshOwnerMap,
+      onWaybillSelectChange,
+      showAllWaybills,
     };
   },
 });
@@ -407,29 +864,123 @@ export default defineComponent({
 
 <style scoped>
 .dashboard {
+  position: relative;
   min-height: 100vh;
-  background-color: #f5f5f5;
+  overflow: hidden;
+  background: radial-gradient(circle at top left, #4f46e5 0, #0f172a 45%, #020617 100%);
+}
+
+.dashboard-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(96, 165, 250, 0.22), transparent 55%),
+    radial-gradient(circle at 80% 90%, rgba(129, 140, 248, 0.25), transparent 55%);
+  opacity: 0.9;
+  filter: blur(2px);
+}
+
+.dashboard-shell {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 20px 16px 32px;
+  color: #e5e7eb;
+}
+
+.dashboard-header {
+  padding-inline: 0;
+}
+
+.dashboard-main {
+  padding-inline: 0;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 100%;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #22c55e, #4ade80);
+  box-shadow: 0 0 12px rgba(22, 163, 74, 0.85);
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.logo-subtitle {
+  font-size: 12px;
+  color: #cbd5f5;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.user-name {
+  color: #e5e7eb;
+}
+
+.dashboard-tabs :deep(.el-tabs__item) {
+  color: #cbd5f5;
+}
+
+.dashboard-tabs :deep(.el-tabs__item.is-active) {
+  color: #60a5fa;
+}
+
+.dashboard-tabs :deep(.el-tabs__active-bar) {
+  background-color: #60a5fa;
+}
+
+.panel-card {
+  background: rgba(15, 23, 42, 0.97);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.9);
 }
 
 .search-bar {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .map-container {
-  background-color: #f0f0f0;
-  border-radius: 4px;
+  background-color: #020617;
+  border-radius: 8px;
+}
+
+@media (max-width: 960px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 </style>

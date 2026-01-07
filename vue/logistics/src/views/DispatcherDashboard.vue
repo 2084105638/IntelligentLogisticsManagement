@@ -6,7 +6,7 @@
           <h2>调度员工作台</h2>
           <div class="user-info">
             <span>{{ userInfo?.username || '调度员' }}</span>
-            <el-button type="text" @click="handleLogout">退出登录</el-button>
+            <el-button link @click="handleLogout">退出登录</el-button>
           </div>
         </div>
       </el-header>
@@ -102,10 +102,19 @@
             </div>
               <el-table :data="carList" style="width: 100%; margin-top: 20px" v-loading="carLoading">
                 <el-table-column prop="carId" label="车辆ID" width="100" />
-                <el-table-column prop="licensePlate" label="车牌号" width="120" />
-                <el-table-column prop="carType" label="车型" width="120" />
-                <el-table-column prop="loadCapacity" label="载重(吨)" width="100" />
-                <el-table-column prop="driverName" label="司机" width="120" />
+                <el-table-column label="司机" width="200">
+                  <template #default="scope">
+                    <div class="driver-cell">
+                      <span v-if="scope.row.driverId">
+                        司机ID：{{ scope.row.driverId }}
+                      </span>
+                      <span v-if="scope.row.driverId" class="driver-id">
+                        姓名：{{ scope.row.driverName || '暂无姓名（仅绑定了ID）' }}
+                      </span>
+                      <span v-else>未分配</span>
+                    </div>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="location" label="位置" width="150" />
                 <el-table-column prop="status" label="状态" width="100">
                   <template #default="scope">
@@ -114,12 +123,20 @@
                     </el-tag>
           </template>
                 </el-table-column>
-                <el-table-column label="操作" width="200" fixed="right">
-              <template #default="scope">
+                <el-table-column label="操作" width="260" fixed="right">
+                  <template #default="scope">
                     <el-button size="small" @click="editCar(scope.row)">编辑</el-button>
                     <el-button size="small" type="danger" @click="deleteCar(scope.row.carId)">删除</el-button>
-              </template>
-            </el-table-column>
+                    <el-button
+                      v-if="scope.row.status === 1"
+                      size="small"
+                      type="warning"
+                      @click="releaseCar(scope.row.carId)"
+                    >
+                      释放车辆
+                    </el-button>
+                  </template>
+                </el-table-column>
           </el-table>
               <el-pagination
                 v-model:current-page="carPage"
@@ -137,13 +154,19 @@
           <!-- 在途监控 -->
           <el-tab-pane label="在途监控" name="monitor">
             <el-card>
-              <div class="map-container" id="monitorMapContainer" style="height: 600px">
-                <div style="text-align: center; padding-top: 250px; color: #999">
-                  地图功能需要集成高德地图或百度地图API
-                  <br />
-                  请配置地图API密钥后使用
-                </div>
+              <div class="map-controls" style="margin-bottom: 15px">
+                <el-select v-model="selectedCarId" placeholder="选择车辆" clearable style="width: 200px" @change="onCarSelectChange">
+                  <el-option
+                    v-for="car in carList"
+                    :key="car.carId"
+                    :label="`车辆${car.carId}${car.driverName ? ' - ' + car.driverName : ''}`"
+                    :value="car.carId"
+                  />
+                </el-select>
+                <el-button type="primary" @click="refreshMap" style="margin-left: 10px">刷新位置</el-button>
+                <el-button @click="showAllCars" style="margin-left: 10px">显示全部车辆</el-button>
               </div>
+              <div class="map-container" id="monitorMapContainer" style="height: 600px"></div>
             </el-card>
           </el-tab-pane>
 
@@ -199,7 +222,7 @@
             <el-option
               v-for="car in availableCars"
               :key="car.carId"
-              :label="`${car.licensePlate} - ${car.driverName || '无司机'}`"
+              :label="`车辆${car.carId}${car.licensePlate ? ' / ' + car.licensePlate : ''}${car.driverName ? ' / 司机：' + car.driverName : ''}`"
               :value="car.carId"
             />
           </el-select>
@@ -214,17 +237,24 @@
     <!-- 车辆编辑对话框 -->
     <el-dialog v-model="carDialogVisible" :title="carDialogTitle" width="600px">
       <el-form :model="carForm" :rules="carRules" ref="carFormRef" label-width="100px">
-        <el-form-item label="车牌号" prop="licensePlate">
-          <el-input v-model="carForm.licensePlate" />
-        </el-form-item>
-        <el-form-item label="车型" prop="carType">
-          <el-input v-model="carForm.carType" />
-        </el-form-item>
-        <el-form-item label="载重(吨)" prop="loadCapacity">
-          <el-input-number v-model="carForm.loadCapacity" :min="0" :precision="2" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="司机ID" prop="driverId">
-          <el-input-number v-model="carForm.driverId" :min="1" style="width: 100%" />
+        <el-form-item label="司机" prop="driverId">
+          <div class="driver-edit">
+            <el-input-number
+              v-model="carForm.driverId"
+              :min="1"
+              :controls="false"
+              style="width: 100%"
+              placeholder="填写要绑定的司机ID，可留空"
+            />
+            <div class="driver-edit-tip">
+              <span v-if="carForm.carId">
+                当前司机：
+                <strong>{{ carForm.driverName || '未绑定' }}</strong>
+                <span v-if="carForm.driverId">（ID: {{ carForm.driverId }}）</span>
+              </span>
+              <span v-else>新增车辆时可暂不绑定司机，后续在此处填写司机ID。</span>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="位置">
           <el-input v-model="carForm.location" placeholder="格式: lat,lng 或 地址" />
@@ -277,11 +307,14 @@ import {
   CarCreateDTO,
   CarUpdateDTO,
   CarQueryDTO,
+  updateCarStatus,
   WaybillVO,
   CarVO,
+  getCarLocation,
 } from '../api';
 import { clearAuth, getUserInfo } from '../utils/auth';
 import { getStatusDesc, getStatusType, getCarStatusDesc, getCarStatusType } from '../utils/waybillStatus';
+import { AMAP_API_KEY, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from '../config/map';
 
 export default defineComponent({
   name: 'DispatcherDashboard',
@@ -320,24 +353,22 @@ export default defineComponent({
       size: 10,
     });
 
-    const assignForm = reactive({
-      waybillId: 0,
-      carId: 0,
+    const assignForm = reactive<{
+      waybillId: string;
+      carId: number | null;
+    }>({
+      waybillId: '',
+      carId: null,
     });
 
-    const carForm = reactive<CarCreateDTO & { carId?: number }>({
+    const carForm = reactive<Partial<CarCreateDTO> & { carId?: number; driverName?: string }>({
       driverId: 0,
-      licensePlate: '',
-      carType: '',
-      loadCapacity: 0,
       location: '',
       status: 0,
+      driverName: '',
     });
 
     const carRules = {
-      licensePlate: [{ required: true, message: '请输入车牌号', trigger: 'blur' }],
-      carType: [{ required: true, message: '请输入车型', trigger: 'blur' }],
-      loadCapacity: [{ required: true, message: '请输入载重', trigger: 'blur' }],
       driverId: [{ required: true, message: '请输入司机ID', trigger: 'blur' }],
     };
 
@@ -348,11 +379,20 @@ export default defineComponent({
       totalCars: 0,
     });
 
+    // 地图相关
+    const selectedCarId = ref<number | null>(null);
+    let mapInstance: any = null;
+    let markers: any[] = [];
+
     onMounted(() => {
       loadUserInfo();
       loadWaybills();
       loadCars();
       loadStatistics();
+      // 延迟加载地图，确保DOM已渲染
+      setTimeout(() => {
+        initMap();
+      }, 500);
     });
 
     const loadUserInfo = async () => {
@@ -375,6 +415,27 @@ export default defineComponent({
         loadCars();
       } else if (tab === 'statistics') {
         loadStatistics();
+      } else if (tab === 'monitor') {
+        // 切换到地图标签页时，确保车辆数据已加载，然后初始化地图并加载车辆位置
+        if (carList.value.length === 0) {
+          loadCars().then(() => {
+            setTimeout(() => {
+              if (!mapInstance) {
+                initMap();
+              } else {
+                refreshMap();
+              }
+            }, 300);
+          });
+        } else {
+          setTimeout(() => {
+            if (!mapInstance) {
+              initMap();
+            } else {
+              refreshMap();
+            }
+          }, 100);
+        }
       }
     };
 
@@ -386,11 +447,56 @@ export default defineComponent({
         const result = await dispatcherQueryWaybills(waybillQuery);
         if (result.data) {
           const pageData = result.data as any;
-          waybillList.value = pageData.records || [];
-          waybillTotal.value = pageData.total || 0;
+          const records: any[] = pageData.records || [];
+          // 1) 过滤掉明确标记为 changed=1 的旧单
+          const filtered = records.filter((w) => w.changed === 0 || w.changed === undefined);
+          // 2) 按业务字段去重，保留"最新且状态优先"的一条
+          const dedupMap = new Map<string, any>();
+          filtered.forEach((w) => {
+            const key = [
+              w.goodsInformation,
+              w.startAddress,
+              w.endAddress,
+              w.expectedTimeLimit,
+              w.cost,
+            ].join('|');
+            const prev = dedupMap.get(key);
+            if (!prev) {
+              dedupMap.set(key, w);
+              return;
+            }
+            const statusPriority = (s: number) => {
+              if (s === 1 || s === 2 || s === 3) return 2;
+              return 1;
+            };
+            const prevPri = statusPriority(prev.status);
+            const curPri = statusPriority(w.status);
+            if (curPri > prevPri) {
+              dedupMap.set(key, w);
+              return;
+            }
+            if (curPri === prevPri) {
+              const prevTime = new Date(prev.createTime).getTime();
+              const curTime = new Date(w.createTime).getTime();
+              if (curTime >= prevTime) {
+                dedupMap.set(key, w);
+              }
+            }
+          });
+          waybillList.value = Array.from(dedupMap.values());
+          waybillTotal.value = waybillList.value.length;
         }
       } catch (error: any) {
-        ElMessage.error(error.message || '加载运单列表失败');
+        // 只在真正严重错误时显示提示（如401、403等），其他错误静默处理
+        if (error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('登录')) {
+          ElMessage.error(error.message || '加载运单列表失败');
+        } else {
+          console.warn('加载运单列表失败:', error.message || error);
+          // 如果已有数据，不清空，保持显示
+          if (waybillList.value.length === 0) {
+            ElMessage.warning('加载运单列表失败，请稍后重试');
+          }
+        }
       } finally {
         loading.value = false;
       }
@@ -410,7 +516,16 @@ export default defineComponent({
           availableCars.value = carList.value.filter((car) => car.status === 0);
         }
       } catch (error: any) {
-        ElMessage.error(error.message || '加载车辆列表失败');
+        // 只在真正严重错误时显示提示（如401、403等），其他错误静默处理
+        if (error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('登录')) {
+          ElMessage.error(error.message || '加载车辆列表失败');
+        } else {
+          console.warn('加载车辆列表失败:', error.message || error);
+          // 如果已有数据，不清空，保持显示
+          if (carList.value.length === 0) {
+            ElMessage.warning('加载车辆列表失败，请稍后重试');
+          }
+        }
       } finally {
         carLoading.value = false;
       }
@@ -438,14 +553,14 @@ export default defineComponent({
 
     const showAssignDialog = (row: WaybillVO) => {
       assignForm.waybillId = row.waybillId;
-      assignForm.carId = 0;
+      assignForm.carId = null;
       // 重新加载可用车辆
       loadCars();
       assignDialogVisible.value = true;
     };
 
     const confirmAssign = async () => {
-      if (!assignForm.carId) {
+      if (assignForm.carId === null || assignForm.carId === undefined) {
         ElMessage.warning('请选择车辆');
         return;
       }
@@ -499,6 +614,7 @@ export default defineComponent({
       carForm.carType = row.carType;
       carForm.loadCapacity = row.loadCapacity;
       carForm.driverId = row.driverId;
+      carForm.driverName = row.driverName || '';
       carForm.location = row.location;
       carForm.status = row.status;
       carDialogVisible.value = true;
@@ -512,9 +628,6 @@ export default defineComponent({
             if (carForm.carId) {
               const updateData: CarUpdateDTO = {
                 carId: carForm.carId,
-                licensePlate: carForm.licensePlate,
-                carType: carForm.carType,
-                loadCapacity: carForm.loadCapacity,
                 driverId: carForm.driverId,
                 location: carForm.location,
                 status: carForm.status,
@@ -523,12 +636,12 @@ export default defineComponent({
               ElMessage.success('更新成功');
             } else {
               const createData: CarCreateDTO = {
-                driverId: carForm.driverId,
-                licensePlate: carForm.licensePlate,
-                carType: carForm.carType,
-                loadCapacity: carForm.loadCapacity,
-                location: carForm.location,
-                status: carForm.status,
+                driverId: carForm.driverId ?? 0,
+                licensePlate: carForm.licensePlate || '',
+                carType: carForm.carType || '',
+                loadCapacity: carForm.loadCapacity ?? 0,
+                location: carForm.location || '',
+                status: carForm.status ?? 0,
               };
               await createCar(createData);
               ElMessage.success('创建成功');
@@ -557,6 +670,438 @@ export default defineComponent({
           ElMessage.error(error.message || '删除失败');
         }
       }
+    };
+
+    const releaseCar = async (carId: number) => {
+      try {
+        await ElMessageBox.confirm('确认将该车辆状态改为“可用”吗？', '释放车辆', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        });
+        await updateCarStatus(carId, 0);
+        ElMessage.success('车辆已释放为可用');
+        loadCars();
+      } catch (error: any) {
+        if (error !== 'cancel') {
+          ElMessage.error(error.message || '释放车辆失败');
+        }
+      }
+    };
+
+    // 初始化地图
+    const initMap = () => {
+      const container = document.getElementById('monitorMapContainer');
+      if (!container) {
+        console.warn('地图容器不存在');
+        return;
+      }
+
+      // 检查是否已加载高德地图API
+      if (typeof (window as any).AMap === 'undefined') {
+        const apiKey = String(AMAP_API_KEY);
+        if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
+          ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
+          return;
+        }
+        // 动态加载高德地图API（包含地理编码服务）
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geocoder&callback=initAMap`;
+        script.async = true;
+        (window as any).initAMap = () => {
+          createMapInstance();
+        };
+        document.head.appendChild(script);
+      } else {
+        createMapInstance();
+      }
+    };
+
+    // 创建地图实例
+    const createMapInstance = () => {
+      const container = document.getElementById('monitorMapContainer');
+      if (!container) return;
+
+      try {
+        mapInstance = new (window as any).AMap.Map('monitorMapContainer', {
+          zoom: DEFAULT_MAP_ZOOM,
+          center: DEFAULT_MAP_CENTER,
+        });
+        refreshMap();
+      } catch (error) {
+        console.error('地图初始化失败:', error);
+        ElMessage.warning('地图初始化失败，请检查高德地图API配置');
+      }
+    };
+
+    // 常见地址的坐标映射（长春市）
+    const addressMap: Record<string, [number, number]> = {
+      '长春': [125.323544, 43.817071],
+      '长春市': [125.323544, 43.817071],
+      '长春工业大学': [125.2875, 43.8964],
+      '长春工业大学北湖西区': [125.2875, 43.8964],
+      '长春工业大学北湖校区': [125.2875, 43.8964],
+      '吉林大学': [125.2985, 43.8844],
+      '吉林大学前卫校区': [125.2985, 43.8844],
+      '宽城': [125.3200, 43.9000],
+      '宽城区': [125.3200, 43.9000],
+      '南关': [125.3300, 43.8600],
+      '南关区': [125.3300, 43.8600],
+      '朝阳': [125.3000, 43.8300],
+      '朝阳区': [125.3000, 43.8300],
+      '绿园': [125.2500, 43.8800],
+      '绿园区': [125.2500, 43.8800],
+      '二道': [125.3800, 43.8700],
+      '二道区': [125.3800, 43.8700],
+      '双阳': [125.6500, 43.5200],
+      '双阳区': [125.6500, 43.5200],
+      '净月': [125.4500, 43.8000],
+      '净月区': [125.4500, 43.8000],
+      '净月潭': [125.4500, 43.8000],
+      '长春站': [125.3235, 43.9065],
+      '长春火车站': [125.3235, 43.9065],
+      '长春西站': [125.2000, 43.8500],
+      '龙嘉机场': [125.7000, 44.0000],
+      '长春龙嘉国际机场': [125.7000, 44.0000],
+      '人民广场': [125.3200, 43.8900],
+      '文化广场': [125.3100, 43.8800],
+      '南湖公园': [125.3000, 43.8500],
+      '伪满皇宫': [125.3500, 43.9200],
+      '长影世纪城': [125.4500, 43.7800],
+      '欧亚卖场': [125.2500, 43.8600],
+      '红旗街': [125.2900, 43.8700],
+      '重庆路': [125.3200, 43.8900],
+      '桂林路': [125.3100, 43.8700],
+      '汽车厂': [125.2200, 43.8500],
+      '一汽': [125.2200, 43.8500],
+      '一汽大众': [125.2200, 43.8500],
+    };
+
+    // 解析位置字符串为坐标
+    const parseLocation = (location: string): [number, number] | null => {
+      if (!location) return null;
+      
+      // 1. 先检查地址映射
+      const trimmedLocation = location.trim();
+      if (addressMap[trimmedLocation]) {
+        console.log(`使用地址映射: ${trimmedLocation} -> [${addressMap[trimmedLocation][0]}, ${addressMap[trimmedLocation][1]}]`);
+        return addressMap[trimmedLocation];
+      }
+      
+      // 2. 尝试解析 "lat,lng" 格式
+      const match = location.match(/([\d.]+),\s*([\d.]+)/);
+      if (match) {
+        return [parseFloat(match[2]), parseFloat(match[1])]; // 注意：高德地图是 [lng, lat]
+      }
+      
+      return null;
+    };
+
+    // 地理编码：将地址转换为坐标（使用高德地图Web服务API）
+    const geocodeAddress = (address: string): Promise<[number, number] | null> => {
+      return new Promise((resolve) => {
+        try {
+          if (!address) {
+            resolve(null);
+            return;
+          }
+
+          // 尝试解析坐标格式
+          const coords = parseLocation(address);
+          if (coords) {
+            resolve(coords);
+            return;
+          }
+
+          // 直接使用JS API进行地理编码（因为当前API密钥是JS API类型）
+          // 如果Web服务API密钥可用，可以改用Web服务API
+          if (typeof (window as any).AMap !== 'undefined') {
+            // 优先使用JS API
+            tryGeocodeWithJSAPI(address, resolve);
+          } else {
+            // 如果AMap未加载，尝试使用Web服务API（需要Web服务类型的密钥）
+            const apiKey = String(AMAP_API_KEY);
+            const encodedAddress = encodeURIComponent(address);
+            const url = `https://restapi.amap.com/v3/geocode/geo?key=${apiKey}&address=${encodedAddress}&city=长春市`;
+            
+            console.log(`AMap未加载，尝试使用Web API地理编码: ${address}`);
+            
+            const timeout = setTimeout(() => {
+              console.warn(`地理编码超时: ${address}`);
+              resolve(null);
+            }, 15000);
+
+            fetch(url)
+              .then(response => {
+                console.log(`Web API响应状态: ${response.status} for ${address}`);
+                if (!response.ok) {
+                  throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+              })
+              .then(data => {
+                clearTimeout(timeout);
+                console.log(`Web API返回数据:`, data);
+                if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
+                  const location = data.geocodes[0].location.split(',');
+                  const lng = parseFloat(location[0]);
+                  const lat = parseFloat(location[1]);
+                  console.log(`地理编码成功: ${address} -> [${lng}, ${lat}]`);
+                  resolve([lng, lat]);
+                } else {
+                  console.warn(`地理编码失败: ${address}`, data);
+                  resolve(null);
+                }
+              })
+              .catch(error => {
+                clearTimeout(timeout);
+                console.error(`地理编码请求失败: ${address}`, error);
+                resolve(null);
+              });
+          }
+        } catch (err) {
+          console.error(`地理编码处理异常: ${address}`, err);
+          resolve(null);
+        }
+      });
+    };
+
+    // 备用方案：使用JS API进行地理编码
+    const tryGeocodeWithJSAPI = (address: string, resolve: (value: [number, number] | null) => void) => {
+      console.log(`尝试使用JS API地理编码: ${address}`);
+      if (typeof (window as any).AMap === 'undefined') {
+        console.warn('AMap未加载，无法使用JS API');
+        resolve(null);
+        return;
+      }
+
+      const AMap = (window as any).AMap;
+      let timeoutId: number | null = null;
+      let resolved = false;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
+
+      const doResolve = (value: [number, number] | null) => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          resolve(value);
+        }
+      };
+
+      // 设置超时（20秒）
+      timeoutId = setTimeout(() => {
+        console.warn(`JS API地理编码超时: ${address}`);
+        doResolve(null);
+      }, 20000);
+
+      // 确保Geocoder插件已加载
+      const loadGeocoder = (callback: () => void) => {
+        if (AMap.Geocoder && typeof AMap.Geocoder === 'function') {
+          console.log('Geocoder已可用');
+          callback();
+        } else {
+          console.log('正在加载Geocoder插件...');
+          AMap.plugin('AMap.Geocoder', () => {
+            console.log('Geocoder插件加载完成');
+            if (AMap.Geocoder && typeof AMap.Geocoder === 'function') {
+              callback();
+            } else {
+              console.error('Geocoder插件加载失败');
+              doResolve(null);
+            }
+          });
+        }
+      };
+
+      loadGeocoder(() => {
+        try {
+          console.log(`使用Geocoder进行地理编码: ${address}`);
+          const geocoder = new AMap.Geocoder({
+            city: '长春市',
+          });
+          
+          console.log(`调用getLocation: ${address}`);
+          geocoder.getLocation(address, (status: string, result: any) => {
+            console.log(`Geocoder回调被触发 - 状态: ${status} for ${address}`, result);
+            if (status === 'complete' && result && result.geocodes && result.geocodes.length > 0) {
+              const location = result.geocodes[0].location;
+              if (location && typeof location.lng === 'number' && typeof location.lat === 'number') {
+                console.log(`地理编码成功(JS API): ${address} -> [${location.lng}, ${location.lat}]`);
+                doResolve([location.lng, location.lat]);
+              } else {
+                console.warn(`地理编码返回的坐标格式不正确:`, location);
+                doResolve(null);
+              }
+            } else {
+              console.warn(`地理编码失败(JS API): ${address}`, status, result);
+              doResolve(null);
+            }
+          });
+          
+          // 额外检查：如果5秒后还没有回调，记录警告
+          setTimeout(() => {
+            if (!resolved) {
+              console.warn(`警告: getLocation调用5秒后仍未收到回调 for ${address}`);
+            }
+          }, 5000);
+        } catch (err) {
+          console.error(`地理编码异常(JS API): ${address}`, err);
+          doResolve(null);
+        }
+      });
+    };
+
+    // 刷新地图上的车辆位置
+    const refreshMap = async () => {
+      if (!mapInstance) {
+        console.log('地图实例不存在，正在初始化...');
+        initMap();
+        // 等待地图初始化完成
+        setTimeout(() => {
+          if (mapInstance) {
+            refreshMap();
+          }
+        }, 1000);
+        return;
+      }
+
+      // 清除现有标记
+      markers.forEach(marker => {
+        mapInstance.remove(marker);
+      });
+      markers = [];
+
+      try {
+        // 检查车辆列表是否已加载
+        if (carList.value.length === 0) {
+          console.log('车辆列表为空，正在加载...');
+          await loadCars();
+        }
+
+        console.log('当前车辆列表:', carList.value.map(car => ({
+          carId: car.carId,
+          location: car.location,
+          status: car.status,
+          driverId: car.driverId,
+        })));
+
+        // 获取所有车辆的位置
+        const carsToShow = selectedCarId.value
+          ? carList.value.filter(car => car.carId === selectedCarId.value)
+          : carList.value;
+
+        console.log(`准备显示 ${carsToShow.length} 辆车辆`);
+
+        if (carsToShow.length === 0) {
+          ElMessage.info('当前没有可显示的车辆');
+          return;
+        }
+
+        // 检查有多少车辆有位置信息
+        const carsWithLocation = carsToShow.filter(car => car.location && car.location.trim() !== '');
+        console.log(`有位置信息的车辆: ${carsWithLocation.length}/${carsToShow.length}`);
+        if (carsWithLocation.length === 0) {
+          ElMessage.warning('当前车辆都没有位置信息，无法在地图上显示');
+          console.warn('所有车辆都没有位置信息:', carsToShow);
+          return;
+        }
+
+        // 统计信息
+        let successCount = 0;
+        let failCount = 0;
+        const failedCars: string[] = [];
+
+        // 使用 Promise.all 并行处理所有车辆的地理编码
+        const carPromises = carsToShow.map(async (car) => {
+          if (!car.location) {
+            failCount++;
+            failedCars.push(`车辆${car.carId}(无位置信息)`);
+            console.warn(`车辆 ${car.carId} 没有位置信息`);
+            return null;
+          }
+
+          console.log(`正在解析车辆 ${car.carId} 的位置: ${car.location}`);
+          const coords = await geocodeAddress(car.location);
+          if (!coords) {
+            failCount++;
+            failedCars.push(`车辆${car.carId}(${car.location})`);
+            console.warn(`车辆 ${car.carId} 的位置无法解析: ${car.location}`);
+            return null;
+          }
+
+          successCount++;
+          console.log(`车辆 ${car.carId} 位置解析成功: [${coords[0]}, ${coords[1]}]`);
+          return {
+            car,
+            coords,
+          };
+        });
+
+        const carLocations = await Promise.all(carPromises);
+
+        // 创建标记
+        for (const item of carLocations) {
+          if (!item) continue;
+
+          const { car, coords } = item;
+          try {
+            const marker = new (window as any).AMap.Marker({
+              position: coords,
+              title: `车辆${car.carId}${car.driverName ? ' - ' + car.driverName : ''}`,
+              label: {
+                content: `车辆${car.carId}`,
+                direction: 'right',
+              },
+            });
+
+            marker.setMap(mapInstance);
+            markers.push(marker);
+            console.log(`车辆 ${car.carId} 标记已添加到地图`);
+          } catch (err) {
+            console.error(`创建车辆 ${car.carId} 标记失败:`, err);
+            failCount++;
+            successCount--;
+          }
+        }
+
+        // 如果有标记，调整地图视野
+        if (markers.length > 0) {
+          mapInstance.setFitView(markers);
+          console.log(`成功显示 ${markers.length} 辆车辆的位置`);
+          if (failCount > 0) {
+            ElMessage.warning(`成功显示 ${successCount} 辆车辆，${failCount} 辆车辆位置解析失败`);
+          } else {
+            ElMessage.success(`成功显示 ${successCount} 辆车辆的位置`);
+          }
+        } else {
+          ElMessage.warning('没有车辆位置可以显示在地图上。请检查车辆是否有位置信息，或位置格式是否正确');
+          console.warn('没有可显示的车辆位置', {
+            totalCars: carsToShow.length,
+            failedCars,
+          });
+        }
+      } catch (error: any) {
+        console.error('刷新地图异常:', error);
+        ElMessage.error('刷新地图失败: ' + (error.message || '未知错误'));
+      }
+    };
+
+    // 车辆选择变化
+    const onCarSelectChange = () => {
+      refreshMap();
+    };
+
+    // 显示全部车辆
+    const showAllCars = () => {
+      selectedCarId.value = null;
+      refreshMap();
     };
 
     const handleLogout = async () => {
@@ -609,11 +1154,16 @@ export default defineComponent({
       editCar,
       saveCar,
       deleteCar,
+      releaseCar,
       handleLogout,
       getStatusDesc,
       getStatusType,
       getCarStatusDesc,
       getCarStatusType,
+      selectedCarId,
+      refreshMap,
+      onCarSelectChange,
+      showAllCars,
     };
   },
 });
@@ -661,5 +1211,28 @@ export default defineComponent({
 .stat-label {
   font-size: 14px;
   color: #666;
+}
+
+.driver-cell {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+
+.driver-id {
+  color: #909399;
+  font-size: 12px;
+}
+
+.driver-edit {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.driver-edit-tip {
+  font-size: 12px;
+  color: #909399;
 }
 </style>

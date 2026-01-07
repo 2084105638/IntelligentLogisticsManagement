@@ -1,90 +1,147 @@
 <template>
-  <div class="login-container">
-    <el-card class="login-card">
-      <template #header>
-        <div class="card-header">
-          <h2>智慧物流管理系统</h2>
-          <el-tabs v-model="activeRole" @tab-change="handleRoleChange">
-            <el-tab-pane label="货主" name="consignor"></el-tab-pane>
-            <el-tab-pane label="调度员" name="dispatcher"></el-tab-pane>
-            <el-tab-pane label="司机" name="driver"></el-tab-pane>
-            <el-tab-pane label="管理员" name="admin"></el-tab-pane>
-          </el-tabs>
+  <div class="login-page">
+    <div class="login-bg"></div>
+    <div class="login-shell">
+      <div class="login-left">
+        <div class="login-logo">
+          <span class="logo-dot" />
+          <div>
+            <div class="logo-title">智慧物流运输管理平台</div>
+            <div class="logo-subtitle">一站式运单调度与执行管理</div>
+          </div>
         </div>
-      </template>
+        <ul class="login-highlights">
+          <li>
+            <span class="dot dot-green"></span>
+            货主实时查看运输进度，支持自助下单与查询
+          </li>
+          <li>
+            <span class="dot dot-blue"></span>
+            调度员统一管理运单与车辆，减少沟通成本
+          </li>
+          <li>
+            <span class="dot dot-yellow"></span>
+            司机移动端接单、上报异常，流程清晰可追溯
+          </li>
+          <li>
+            <span class="dot dot-red"></span>
+            管理员全局监控运行状态，提升安全与合规性
+          </li>
+        </ul>
+        <div class="login-tip">
+          <span>提示：</span>
+          货主 / 司机支持在线注册，调度员 / 管理员由系统管理员分配账号。
+        </div>
+      </div>
 
-      <el-form
-        ref="loginFormRef"
-        :model="loginForm"
-        :rules="loginRules"
-        label-width="80px"
-        v-if="!showRegister"
-      >
-        <el-form-item :label="activeRole === 'admin' ? '用户名' : '手机号'" prop="phone">
-          <el-input 
-            v-model="loginForm.phone" 
-            :placeholder="activeRole === 'admin' ? '请输入用户名' : '请输入手机号'" 
-          />
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input
-            v-model="loginForm.password"
-            type="password"
-            placeholder="请输入密码"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleLogin" :loading="loading" style="width: 100%">
-            登录
-          </el-button>
-        </el-form-item>
-        <el-form-item v-if="activeRole === 'consignor' || activeRole === 'driver'">
-          <el-link type="primary" @click="showRegister = true">还没有账号？立即注册</el-link>
-        </el-form-item>
-      </el-form>
+      <div class="login-right">
+        <el-card class="login-card" shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <div class="card-title-group">
+                <h2>欢迎登录</h2>
+                <p>请选择您的登录角色并输入账号信息</p>
+              </div>
+              <el-tabs v-model="activeRole" @tab-change="handleRoleChange" class="role-tabs">
+                <el-tab-pane label="货主" name="consignor" />
+                <el-tab-pane label="调度员" name="dispatcher" />
+                <el-tab-pane label="司机" name="driver" />
+                <el-tab-pane label="管理员" name="admin" />
+              </el-tabs>
+            </div>
+          </template>
 
-      <!-- 注册表单 -->
-      <el-form
-        ref="registerFormRef"
-        :model="registerForm"
-        :rules="registerRules"
-        label-width="100px"
-        v-else
-      >
-        <el-form-item label="手机号" prop="phone" v-if="activeRole === 'driver'">
-          <el-input v-model="registerForm.phone" placeholder="请输入手机号" />
-        </el-form-item>
-        <el-form-item label="邮箱" prop="email" v-if="activeRole === 'consignor'">
-          <el-input v-model="registerForm.email" placeholder="请输入邮箱" />
-        </el-form-item>
-        <el-form-item label="手机号" prop="phone" v-if="activeRole === 'consignor'">
-          <el-input v-model="registerForm.phone" placeholder="请输入手机号" />
-        </el-form-item>
-        <el-form-item label="姓名" prop="name" v-if="activeRole === 'driver'">
-          <el-input v-model="registerForm.name" placeholder="请输入姓名" />
-        </el-form-item>
-        <el-form-item label="驾驶证号" prop="licenseNumber" v-if="activeRole === 'driver'">
-          <el-input v-model="registerForm.licenseNumber" placeholder="请输入驾驶证号" />
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input
-            v-model="registerForm.password"
-            type="password"
-            placeholder="请输入密码"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleRegister" :loading="loading" style="width: 100%">
-            注册
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-link type="primary" @click="showRegister = false">已有账号？立即登录</el-link>
-        </el-form-item>
-      </el-form>
-    </el-card>
+          <el-form
+            ref="loginFormRef"
+            :model="loginForm"
+            :rules="loginRules"
+            label-width="80px"
+            v-if="!showRegister"
+          >
+            <el-form-item
+              :label="activeRole === 'admin' || activeRole === 'dispatcher' ? '用户名' : activeRole === 'driver' ? '账号' : '手机号'"
+              prop="phone"
+            >
+              <el-input
+                v-model="loginForm.phone"
+                :placeholder="activeRole === 'admin' || activeRole === 'dispatcher'
+                  ? '请输入用户名'
+                  : activeRole === 'driver'
+                    ? '请输入司机账号（可为手机号）'
+                    : '请输入手机号'"
+              />
+            </el-form-item>
+            <el-form-item label="密码" prop="password">
+              <el-input
+                v-model="loginForm.password"
+                type="password"
+                placeholder="请输入密码"
+                show-password
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button
+                type="primary"
+                @click="handleLogin"
+                :loading="loading"
+                class="full-btn"
+              >
+                登录
+              </el-button>
+            </el-form-item>
+            <el-form-item v-if="activeRole === 'consignor' || activeRole === 'driver'">
+              <el-link type="primary" @click="showRegister = true">还没有账号？立即注册</el-link>
+            </el-form-item>
+          </el-form>
+
+          <!-- 注册表单 -->
+          <el-form
+            ref="registerFormRef"
+            :model="registerForm"
+            :rules="registerRules"
+            label-width="100px"
+            v-else
+          >
+            <el-form-item label="手机号" prop="phone" v-if="activeRole === 'driver'">
+              <el-input v-model="registerForm.phone" placeholder="请输入手机号" />
+            </el-form-item>
+            <el-form-item label="邮箱" prop="email" v-if="activeRole === 'consignor'">
+              <el-input v-model="registerForm.email" placeholder="请输入邮箱" />
+            </el-form-item>
+            <el-form-item label="手机号" prop="phone" v-if="activeRole === 'consignor'">
+              <el-input v-model="registerForm.phone" placeholder="请输入手机号" />
+            </el-form-item>
+            <el-form-item label="姓名" prop="name" v-if="activeRole === 'driver'">
+              <el-input v-model="registerForm.name" placeholder="请输入姓名" />
+            </el-form-item>
+            <el-form-item label="驾驶证号" prop="licenseNumber" v-if="activeRole === 'driver'">
+              <el-input v-model="registerForm.licenseNumber" placeholder="请输入驾驶证号" />
+            </el-form-item>
+            <el-form-item label="密码" prop="password">
+              <el-input
+                v-model="registerForm.password"
+                type="password"
+                placeholder="请输入密码"
+                show-password
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button
+                type="primary"
+                @click="handleRegister"
+                :loading="loading"
+                class="full-btn"
+              >
+                注册
+              </el-button>
+            </el-form-item>
+            <el-form-item>
+              <el-link type="primary" @click="showRegister = false">已有账号？立即登录</el-link>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -118,7 +175,7 @@ export default defineComponent({
     const loginForm = reactive({
       phone: '',
       password: '',
-      username: '', // 调度员使用
+      username: '', // 调度员、管理员使用
     });
 
     const registerForm = reactive({
@@ -130,7 +187,7 @@ export default defineComponent({
     });
 
     const loginRules = {
-      phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }],
+      phone: [{ required: true, message: '请输入手机号或用户名', trigger: 'blur' }],
       password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
       username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
     };
@@ -140,7 +197,10 @@ export default defineComponent({
         { required: true, message: '请输入邮箱', trigger: 'blur' },
         { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' },
       ],
-      phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }],
+      phone: [
+        { required: true, message: '请输入手机号', trigger: 'blur' },
+        { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号', trigger: 'blur' },
+      ],
       password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
       name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
       licenseNumber: [{ required: true, message: '请输入驾驶证号', trigger: 'blur' }],
@@ -165,8 +225,9 @@ export default defineComponent({
           try {
             let result: any;
             if (activeRole.value === 'consignor') {
+              // 货主：后端使用 account 字段（可为手机号或邮箱）
               result = await consignorLogin({
-                phone: loginForm.phone,
+                account: loginForm.phone,
                 password: loginForm.password,
               });
             } else if (activeRole.value === 'dispatcher') {
@@ -175,8 +236,9 @@ export default defineComponent({
                 password: loginForm.password,
               });
             } else if (activeRole.value === 'driver') {
+              // 司机登录：后端字段为 account
               result = await driverLogin({
-                phone: loginForm.phone,
+                account: loginForm.phone,
                 password: loginForm.password,
               });
             } else if (activeRole.value === 'admin') {
@@ -264,25 +326,187 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.login-container {
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: radial-gradient(circle at top left, #4f46e5 0, #0f172a 45%, #020617 100%);
+}
+
+.login-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(96, 165, 250, 0.25), transparent 55%),
+    radial-gradient(circle at 90% 80%, rgba(129, 140, 248, 0.22), transparent 55%);
+  opacity: 0.95;
+  filter: blur(2px);
+}
+
+.login-shell {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 32px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: center;
+  color: #e5e7eb;
+}
+
+.login-left {
+  padding-right: 16px;
+}
+
+.login-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.logo-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #22c55e, #4ade80);
+  box-shadow: 0 0 14px rgba(22, 163, 74, 0.85);
+}
+
+.logo-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.logo-subtitle {
+  font-size: 13px;
+  color: #cbd5f5;
+  margin-top: 2px;
+}
+
+.login-highlights {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.login-highlights li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d1d5db;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.dot-green {
+  background: #22c55e;
+}
+
+.dot-blue {
+  background: #3b82f6;
+}
+
+.dot-yellow {
+  background: #eab308;
+}
+
+.dot-red {
+  background: #f97373;
+}
+
+.login-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.login-tip span {
+  color: #e5e7eb;
+}
+
+.login-right {
   display: flex;
   justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .login-card {
-  width: 450px;
+  width: 420px;
+  background: rgba(15, 23, 42, 0.97);
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  box-shadow: 0 20px 55px rgba(15, 23, 42, 0.9);
 }
 
 .card-header {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.card-header h2 {
-  margin: 0 0 20px 0;
-  color: #333;
+.card-title-group h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #f9fafb;
+}
+
+.card-title-group p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.role-tabs :deep(.el-tabs__item) {
+  color: #cbd5f5;
+}
+
+.role-tabs :deep(.el-tabs__item.is-active) {
+  color: #60a5fa;
+}
+
+.role-tabs :deep(.el-tabs__active-bar) {
+  background-color: #60a5fa;
+}
+
+.full-btn {
+  width: 100%;
+}
+
+@media (max-width: 960px) {
+  .login-shell {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+
+  .login-left {
+    padding-right: 0;
+  }
+
+  .login-right {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .login-shell {
+    padding-inline: 16px;
+  }
+
+  .login-card {
+    width: 100%;
+  }
 }
 </style>
 
