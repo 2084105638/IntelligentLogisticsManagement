@@ -69,10 +69,10 @@ export const changeConsignorInfo = (data: ConsignorChangeInfoDTO) => {
 
 // ============ 运单相关API ============
 export interface WaybillCreateDTO {
-  receivingConsignorId: number;
+  receivingConsignorId: string | number; // 使用字符串避免 Long 类型精度丢失
   goodsInformation: string;
-  startAddress: string;
-  endAddress: string;
+  startAddress: string; // 传递给后端的经纬度 (格式: 纬度,经度)
+  endAddress: string; // 传递给后端的经纬度 (格式: 纬度,经度)
   expectedTimeLimit: string; // 格式: yyyy-MM-dd HH:mm:ss
   cost: number;
 }
