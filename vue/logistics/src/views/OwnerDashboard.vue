@@ -92,13 +92,21 @@
                     style="width: 100%"
                   />
                 </el-form-item>
-                <el-form-item label="收货人ID" prop="receivingConsignorId">
-                  <el-input
+                <el-form-item label="收货人" prop="receivingConsignorId">
+                  <el-select
                     v-model="waybillForm.receivingConsignorId"
-                    type="text"
-                    placeholder="请输入收货人ID"
+                    placeholder="请选择收货人"
+                    filterable
                     style="width: 100%"
-                  />
+                    :loading="consignorListLoading"
+                  >
+                    <el-option
+                      v-for="consignor in consignorList"
+                      :key="consignor.consignorId"
+                      :label="`ID: ${consignor.consignorId} / 手机: ${consignor.phone || '无'} / 邮箱: ${consignor.email || '无'}`"
+                      :value="consignor.consignorId"
+                    />
+                  </el-select>
                 </el-form-item>
                 <el-form-item>
                   <el-button type="primary" @click="handleCreateWaybill" :loading="creating">
@@ -291,7 +299,9 @@ import {
   cancelWaybill as cancelWaybillAPI,
   getConsignorInfo,
   changeConsignorInfo,
+  listAllConsignors,
   type ConsignorChangeInfoDTO,
+  type ConsignorVO,
   type WaybillCreateDTO,
   type WaybillVO,
 } from '../api';
@@ -299,25 +309,25 @@ import { clearAuth, getUserInfo } from '../utils/auth';
 import { getStatusDesc, getStatusType } from '../utils/waybillStatus';
 import { AMAP_API_KEY, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from '../config/map';
 
-const router = useRouter();
-const activeTab = ref('create');
-const loading = ref(false);
-const creating = ref(false);
-const waybillFormRef = ref();
-const waybillList = ref<WaybillVO[]>([]);
-const currentPage = ref(1);
-const pageSize = ref(10);
-const total = ref(0);
-const queryStatus = ref<number | undefined>(undefined);
-const detailDialogVisible = ref(false);
-const currentWaybill = ref<WaybillVO | null>(null);
-const userInfo = ref<any>(null);
+    const router = useRouter();
+    const activeTab = ref('create');
+    const loading = ref(false);
+    const creating = ref(false);
+    const waybillFormRef = ref();
+    const waybillList = ref<WaybillVO[]>([]);
+    const currentPage = ref(1);
+    const pageSize = ref(10);
+    const total = ref(0);
+    const queryStatus = ref<number | undefined>(undefined);
+    const detailDialogVisible = ref(false);
+    const currentWaybill = ref<WaybillVO | null>(null);
+    const userInfo = ref<any>(null);
 const profileFormRef = ref();
 const updating = ref(false);
 
-const profileForm = reactive({
-  phone: '',
-  email: '',
+    const profileForm = reactive({
+      phone: '',
+      email: '',
   oldPassword: '',
   newPassword: '',
   confirmPassword: '',
@@ -380,12 +390,16 @@ const profileRules = {
 
 const waybillForm = reactive<WaybillCreateDTO>({
   receivingConsignorId: '',
-  goodsInformation: '',
+      goodsInformation: '',
   startAddress: '', // 存储经纬度 (格式: 纬度,经度)
   endAddress: '', // 存储经纬度 (格式: 纬度,经度)
-  expectedTimeLimit: '',
-  cost: 0,
-});
+      expectedTimeLimit: '',
+      cost: 0,
+    });
+
+// 收货人列表
+const consignorList = ref<ConsignorVO[]>([]);
+const consignorListLoading = ref(false);
 
 // 用于显示的地址名称（不发送给后端）
 const startAddressDisplay = ref('');
@@ -409,48 +423,65 @@ const startPickedAddressText = ref('');
 const endPickedLocationText = ref('');
 const endPickedAddressText = ref('');
 
-const waybillRules = {
-  goodsInformation: [{ required: true, message: '请输入货物信息', trigger: 'blur' }],
-  startAddress: [{ required: true, message: '请输入发货地址', trigger: 'blur' }],
-  endAddress: [{ required: true, message: '请输入收货地址', trigger: 'blur' }],
-  expectedTimeLimit: [{ required: true, message: '请选择期望时效', trigger: 'change' }],
-  cost: [{ required: true, message: '请输入费用', trigger: 'blur' }],
-  receivingConsignorId: [{ required: true, message: '请输入收货人ID', trigger: 'blur' }],
-};
+    const waybillRules = {
+      goodsInformation: [{ required: true, message: '请输入货物信息', trigger: 'blur' }],
+      startAddress: [{ required: true, message: '请输入发货地址', trigger: 'blur' }],
+      endAddress: [{ required: true, message: '请输入收货地址', trigger: 'blur' }],
+      expectedTimeLimit: [{ required: true, message: '请选择期望时效', trigger: 'change' }],
+      cost: [{ required: true, message: '请输入费用', trigger: 'blur' }],
+      receivingConsignorId: [{ required: true, message: '请选择收货人', trigger: 'change' }],
+    };
 
 // 地图相关
 const selectedWaybillId = ref<string | null>(null);
 let ownerMapInstance: any = null;
 let ownerMarkers: any[] = [];
 
-onMounted(() => {
-  loadUserInfo();
-  if (activeTab.value === 'track') {
-    loadWaybills();
-  }
+    onMounted(() => {
+      loadUserInfo();
+  loadConsignors();
+      if (activeTab.value === 'track') {
+        loadWaybills();
+      }
   setTimeout(() => {
     initOwnerMap();
   }, 500);
-});
+    });
 
-const loadUserInfo = async () => {
+    const loadUserInfo = async () => {
+      try {
+        const info = getUserInfo();
+        userInfo.value = info;
+        const result = await getConsignorInfo();
+        if (result.data) {
+          const userData = result.data as any;
+          profileForm.phone = userData.phone || '';
+          profileForm.email = userData.email || '';
+        }
+      } catch (error) {
+        console.error('加载用户信息失败:', error);
+      }
+    };
+
+// 加载收货人列表
+const loadConsignors = async () => {
+  consignorListLoading.value = true;
   try {
-    const info = getUserInfo();
-    userInfo.value = info;
-    const result = await getConsignorInfo();
-    if (result.data) {
-      const userData = result.data as any;
-      profileForm.phone = userData.phone || '';
-      profileForm.email = userData.email || '';
+    const result = await listAllConsignors();
+    if (result.data && Array.isArray(result.data)) {
+      consignorList.value = result.data as ConsignorVO[];
     }
-  } catch (error) {
-    console.error('加载用户信息失败:', error);
-  }
-};
+  } catch (error: any) {
+    console.error('加载收货人列表失败:', error);
+    ElMessage.warning('加载收货人列表失败，请稍后重试');
+  } finally {
+    consignorListLoading.value = false;
+      }
+    };
 
-const handleTabChange = (tab: string) => {
-  if (tab === 'track') {
-    loadWaybills();
+    const handleTabChange = (tab: string) => {
+      if (tab === 'track') {
+        loadWaybills();
   } else if (tab === 'realtime') {
     if (waybillList.value.length === 0) {
       loadWaybills().then(() => {
@@ -606,50 +637,50 @@ const confirmLocationPick = () => {
     endPickedAddressText.value = pickedAddressText.value;
   }
   locationPickerVisible.value = false;
-};
+    };
 
-const handleCreateWaybill = async () => {
-  if (!waybillFormRef.value) return;
-  await waybillFormRef.value.validate(async (valid: boolean) => {
-    if (valid) {
-      creating.value = true;
-      try {
-        await createWaybill(waybillForm);
-        ElMessage.success('运单创建成功');
-        resetForm();
-        activeTab.value = 'track';
-        loadWaybills();
-      } catch (error: any) {
-        ElMessage.error(error.message || '创建运单失败');
-      } finally {
-        creating.value = false;
-      }
-    }
-  });
-};
+    const handleCreateWaybill = async () => {
+      if (!waybillFormRef.value) return;
+      await waybillFormRef.value.validate(async (valid: boolean) => {
+        if (valid) {
+          creating.value = true;
+          try {
+            await createWaybill(waybillForm);
+            ElMessage.success('运单创建成功');
+            resetForm();
+            activeTab.value = 'track';
+            loadWaybills();
+          } catch (error: any) {
+            ElMessage.error(error.message || '创建运单失败');
+          } finally {
+            creating.value = false;
+          }
+        }
+      });
+    };
 
-const resetForm = () => {
+    const resetForm = () => {
   waybillForm.receivingConsignorId = '';
-  waybillForm.goodsInformation = '';
-  waybillForm.startAddress = '';
-  waybillForm.endAddress = '';
-  waybillForm.expectedTimeLimit = '';
-  waybillForm.cost = 0;
+      waybillForm.goodsInformation = '';
+      waybillForm.startAddress = '';
+      waybillForm.endAddress = '';
+      waybillForm.expectedTimeLimit = '';
+      waybillForm.cost = 0;
   startAddressDisplay.value = '';
   endAddressDisplay.value = '';
   startPickedLocationText.value = '';
   endPickedLocationText.value = '';
   startPickedAddressText.value = '';
   endPickedAddressText.value = '';
-  waybillFormRef.value?.resetFields();
-};
+      waybillFormRef.value?.resetFields();
+    };
 
-const loadWaybills = async () => {
-  loading.value = true;
-  try {
-    const result = await queryWaybillsByStatus(queryStatus.value, currentPage.value, pageSize.value);
-    if (result.data) {
-      const pageData = result.data as any;
+    const loadWaybills = async () => {
+      loading.value = true;
+      try {
+        const result = await queryWaybillsByStatus(queryStatus.value, currentPage.value, pageSize.value);
+        if (result.data) {
+          const pageData = result.data as any;
       const records: any[] = pageData.records || [];
       const filtered = records.filter((w) => w.changed === 0 || w.changed === undefined);
       const dedupMap = new Map<string, any>();
@@ -686,56 +717,56 @@ const loadWaybills = async () => {
       });
       waybillList.value = Array.from(dedupMap.values());
       total.value = waybillList.value.length;
-    }
-  } catch (error: any) {
-    ElMessage.error(error.message || '加载运单列表失败');
-  } finally {
-    loading.value = false;
-  }
-};
+        }
+      } catch (error: any) {
+        ElMessage.error(error.message || '加载运单列表失败');
+      } finally {
+        loading.value = false;
+      }
+    };
 
-const viewWaybillDetail = async (row: WaybillVO) => {
-  try {
-    const result = await getWaybillDetail(row.waybillId);
-    if (result.data) {
-      currentWaybill.value = result.data as unknown as WaybillVO;
-      detailDialogVisible.value = true;
-    }
-  } catch (error: any) {
-    ElMessage.error(error.message || '获取运单详情失败');
-  }
-};
+    const viewWaybillDetail = async (row: WaybillVO) => {
+      try {
+        const result = await getWaybillDetail(row.waybillId);
+        if (result.data) {
+          currentWaybill.value = result.data as unknown as WaybillVO;
+          detailDialogVisible.value = true;
+        }
+      } catch (error: any) {
+        ElMessage.error(error.message || '获取运单详情失败');
+      }
+    };
 
 const cancelWaybill = async (waybillId: string) => {
-  try {
-    await ElMessageBox.confirm('确定要取消该运单吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    });
-    await cancelWaybillAPI(waybillId);
-    ElMessage.success('运单已取消');
-    loadWaybills();
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.message || '取消运单失败');
-    }
-  }
-};
+      try {
+        await ElMessageBox.confirm('确定要取消该运单吗？', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        });
+        await cancelWaybillAPI(waybillId);
+        ElMessage.success('运单已取消');
+        loadWaybills();
+      } catch (error: any) {
+        if (error !== 'cancel') {
+          ElMessage.error(error.message || '取消运单失败');
+        }
+      }
+    };
 
-const confirmReceive = async (row: WaybillVO) => {
-  try {
-    await ElMessageBox.confirm('确认已收到货物？', '确认签收', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      type: 'success',
-    });
-    ElMessage.success('签收成功');
-    loadWaybills();
-  } catch (error) {
-    // 用户取消
-  }
-};
+    const confirmReceive = async (row: WaybillVO) => {
+      try {
+        await ElMessageBox.confirm('确认已收到货物？', '确认签收', {
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          type: 'success',
+        });
+        ElMessage.success('签收成功');
+        loadWaybills();
+      } catch (error) {
+        // 用户取消
+      }
+    };
 
 const resetProfileForm = () => {
   profileFormRef.value?.resetFields();
@@ -1042,17 +1073,17 @@ const onWaybillSelectChange = () => {
 const showAllWaybills = () => {
   selectedWaybillId.value = null;
   refreshOwnerMap();
-};
+    };
 
-const handleLogout = async () => {
-  try {
-    clearAuth();
-    ElMessage.success('已退出登录');
-    router.push('/login');
-  } catch (error) {
-    router.push('/login');
-  }
-};
+    const handleLogout = async () => {
+      try {
+        clearAuth();
+        ElMessage.success('已退出登录');
+        router.push('/login');
+      } catch (error) {
+        router.push('/login');
+      }
+    };
 </script>
 
 <style scoped>

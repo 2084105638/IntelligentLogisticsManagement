@@ -55,6 +55,19 @@ export const getConsignorInfo = () => {
   return request.get<Result>('/consignor/info');
 };
 
+// 货主信息VO（用于列表展示）
+export interface ConsignorVO {
+  consignorId: number;
+  userId: number;
+  email: string;
+  phone: string;
+}
+
+// 获取所有货主列表（用于选择收货人）
+export const listAllConsignors = () => {
+  return request.get<Result<ConsignorVO[]>>('/consignor/list');
+};
+
 // 更新货主信息（对应后端 ConsignorChangeInfoDTO）
 export interface ConsignorChangeInfoDTO {
   email?: string;
