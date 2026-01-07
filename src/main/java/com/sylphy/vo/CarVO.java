@@ -8,4 +8,5 @@ public class CarVO {
     private String location;
     private Integer status;
     private Long driverId;
+    private Integer type;
 }

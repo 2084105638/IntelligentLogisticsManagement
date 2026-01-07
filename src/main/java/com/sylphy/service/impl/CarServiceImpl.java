@@ -23,13 +23,13 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class CarServiceImpl implements CarService {
-
+    
     private final CarDao carDao;
-
+    
     public CarServiceImpl(CarDao carDao) {
         this.carDao = carDao;
     }
-
+    
     @Override
     public Long createCar(CarCreateDTO dto) {
         Car car = new Car();
@@ -43,7 +43,7 @@ public class CarServiceImpl implements CarService {
         }
         return car.getCarId();
     }
-
+    
     @Override
     public void updateCar(CarUpdateDTO dto) {
         Car car = carDao.selectById(dto.getCarId());
@@ -59,9 +59,12 @@ public class CarServiceImpl implements CarService {
         if (dto.getStatus() != null) {
             car.setStatus(dto.getStatus());
         }
+        if (dto.getType() != null) {
+            car.setType(dto.getType());
+        }
         carDao.updateById(car);
     }
-
+    
     @Override
     public void deleteCar(Long carId) {
         int rows = carDao.deleteById(carId);
@@ -69,22 +72,22 @@ public class CarServiceImpl implements CarService {
             throw new BusinessException("删除车辆失败");
         }
     }
-
+    
     @Override
     public PageResult<CarVO> queryCars(CarQueryDTO dto) {
         LambdaQueryWrapper<Car> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(dto.getStatus() != null, Car::getStatus, dto.getStatus())
                 .eq(dto.getDriverId() != null, Car::getDriverId, dto.getDriverId())
                 .like(StringUtils.hasText(dto.getLocation()), Car::getLocation, dto.getLocation());
-
+        
         Page<Car> page = new Page<>(dto.getCurrent(), dto.getSize());
         Page<Car> rp = carDao.selectPage(page, wrapper);
         List<CarVO> list = rp.getRecords().stream()
-                .map(c -> BeanUtil.copyProperties(c, CarVO.class))
-                .collect(Collectors.toList());
+                                   .map(c -> BeanUtil.copyProperties(c, CarVO.class))
+                                   .collect(Collectors.toList());
         return new PageResult<>(rp.getTotal(), rp.getCurrent(), rp.getSize(), list);
     }
-
+    
     @Override
     public Integer getStatus(Long carId) {
         Car car = carDao.selectById(carId);
@@ -93,7 +96,7 @@ public class CarServiceImpl implements CarService {
         }
         return car.getStatus();
     }
-
+    
     @Override
     public void updateStatus(Long carId, Integer status) {
         Car car = carDao.selectById(carId);
@@ -103,7 +106,7 @@ public class CarServiceImpl implements CarService {
         car.setStatus(status);
         carDao.updateById(car);
     }
-
+    
     @Override
     public String getLocation(Long carId) {
         Car car = carDao.selectById(carId);
@@ -112,7 +115,7 @@ public class CarServiceImpl implements CarService {
         }
         return car.getLocation();
     }
-
+    
     @Override
     public void updateLocation(Long carId, String location) {
         Car car = carDao.selectById(carId);
