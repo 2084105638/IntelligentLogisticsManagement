@@ -28,9 +28,6 @@ public class Dispatcher implements Serializable {
     @TableField("phone")
     private String phone;
     
-    @TableField("status")
-    private Integer status;
-    
     @TableField("create_time")
     private Date createTime;
     

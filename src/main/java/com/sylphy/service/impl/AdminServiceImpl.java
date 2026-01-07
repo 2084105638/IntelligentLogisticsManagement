@@ -181,7 +181,6 @@ public class AdminServiceImpl implements AdminService {
             dispatcher.setPassword(encryptedPassword);
             dispatcher.setEmail(createDTO.getEmail());
             dispatcher.setPhone(createDTO.getPhone());
-            dispatcher.setStatus(1); // 默认启用
             dispatcher.setCreateTime(new Date());
             dispatcherDao.insert(dispatcher);
             log.info("管理员创建调度员成功，userId: {}, dispatcherId: {}", user.getUserId(), dispatcher.getDispatcherId());
