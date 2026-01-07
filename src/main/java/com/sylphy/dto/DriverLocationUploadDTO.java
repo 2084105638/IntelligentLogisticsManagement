@@ -16,7 +16,8 @@ public class DriverLocationUploadDTO {
     private String location;
     
     /**
-     * 当前关联的运单ID（可选，若为空则表示空载）
+     * 当前关联的运单唯一标识ID（可选，若为空则表示空载）
      */
-    private Long waybillId;
+    private Long waybillIdentification;
+
 }

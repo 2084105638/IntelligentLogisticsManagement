@@ -23,8 +23,8 @@ public class Location implements Serializable {
     /**
      * 关联运单 id
      */
-    @TableField("waybill_id")
-    private Long waybillId;
+    @TableField("waybill_identification")
+    private Long waybillIdentification;
     
     /**
      * 位置信息

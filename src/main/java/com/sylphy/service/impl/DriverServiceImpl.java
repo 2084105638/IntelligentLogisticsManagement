@@ -166,13 +166,13 @@ public class DriverServiceImpl implements DriverService {
         carDao.updateById(car);
 
         // 2. 如果有运单，记录运单轨迹
-        if (dto.getWaybillId() != null) {
+        if (dto.getWaybillIdentification() != null) {
             // 可选：校验运单是否存在且状态正确
-            Waybill waybill = waybillDao.selectById(dto.getWaybillId());
+            Waybill waybill = waybillDao.selectById(dto.getWaybillIdentification());
             if (waybill != null) {
                 // 插入历史轨迹
                 Location location = new Location();
-                location.setWaybillId(dto.getWaybillId());
+                location.setWaybillIdentification(dto.getWaybillIdentification());
                 location.setLocationInfo(dto.getLocation());
                 location.setLocationDate(new Date());
                 locationDao.insert(location);

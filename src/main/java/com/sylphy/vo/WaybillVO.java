@@ -19,6 +19,10 @@ public class WaybillVO {
      * 运单主键 id
      */
     private Long waybillId;
+    /**
+     * 运单标识 id，运单标识 id，相同的运单不同的历史具有相同的 id
+     */
+    private Long waybillIdentification;
 
     /**
      * 货主 ID
