@@ -3,6 +3,7 @@ package com.sylphy.controller;
 import com.sylphy.common.PageResult;
 import com.sylphy.common.RedisCache;
 import com.sylphy.common.Result;
+import com.sylphy.dto.DriverLocationUploadDTO;
 import com.sylphy.dto.DriverLoginDTO;
 import com.sylphy.dto.DriverRegisterDTO;
 import com.sylphy.dto.WaybillQueryDTO;
@@ -87,6 +88,22 @@ public class DriverController {
 
         assignmentService.changeStatus(waybillId, WaybillStatus.COMPLETED.getCode(), driverId);
         return Result.success("已完成运输");
+    }
+    
+    /**
+     * 上传位置信息
+     */
+    @PostMapping("/location")
+    public Result uploadLocation(@RequestHeader("Authorization") String token,
+                                 @Valid @RequestBody DriverLocationUploadDTO uploadDTO) {
+        Long driverId = redisCache.getDriverIdByToken(token);
+        if (driverId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        redisCache.refreshToken(token);
+        
+        driverService.uploadLocation(driverId, uploadDTO);
+        return Result.success("位置上传成功");
     }
     
     /**

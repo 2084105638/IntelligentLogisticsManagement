@@ -1,6 +1,7 @@
 package com.sylphy.service;
 
 import com.sylphy.common.PageResult;
+import com.sylphy.dto.DriverLocationUploadDTO;
 import com.sylphy.dto.DriverLoginDTO;
 import com.sylphy.dto.DriverRegisterDTO;
 import com.sylphy.dto.WaybillQueryDTO;
@@ -18,4 +19,12 @@ public interface DriverService {
     DriverLoginVO login(@Valid DriverLoginDTO loginDTO);
 
     PageResult<WaybillVO> queryWaybills(Long driverId, WaybillQueryDTO queryDTO);
+
+    /**
+     * 上传司机/车辆位置
+     *
+     * @param driverId 司机ID
+     * @param dto      位置信息
+     */
+    void uploadLocation(Long driverId, DriverLocationUploadDTO dto);
 }

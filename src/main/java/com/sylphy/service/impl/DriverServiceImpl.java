@@ -8,16 +8,19 @@ import com.sylphy.common.PageResult;
 import com.sylphy.common.RedisCache;
 import com.sylphy.common.StringTools;
 import com.sylphy.common.WaybillStatus;
+import com.sylphy.dto.DriverLocationUploadDTO;
 import com.sylphy.dto.DriverLoginDTO;
 import com.sylphy.dto.DriverRegisterDTO;
 import com.sylphy.dto.WaybillQueryDTO;
 import com.sylphy.entity.model.Car;
 import com.sylphy.entity.model.Driver;
+import com.sylphy.entity.model.Location;
 import com.sylphy.entity.model.User;
 import com.sylphy.entity.model.Waybill;
 import com.sylphy.exception.BusinessException;
 import com.sylphy.mapper.CarDao;
 import com.sylphy.mapper.DriverDao;
+import com.sylphy.mapper.LocationDao;
 import com.sylphy.mapper.UserDao;
 import com.sylphy.mapper.WaybillDao;
 import com.sylphy.service.DriverService;
@@ -29,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,13 +49,15 @@ public class DriverServiceImpl implements DriverService {
     private final RedisCache redisCache;
     private final CarDao carDao;
     private final WaybillDao waybillDao;
+    private final LocationDao locationDao;
 
-    public DriverServiceImpl(DriverDao driverDao, UserDao userDao, RedisCache redisCache, CarDao carDao, WaybillDao waybillDao) {
+    public DriverServiceImpl(DriverDao driverDao, UserDao userDao, RedisCache redisCache, CarDao carDao, WaybillDao waybillDao, LocationDao locationDao) {
         this.driverDao = driverDao;
         this.userDao = userDao;
         this.redisCache = redisCache;
         this.carDao = carDao;
         this.waybillDao = waybillDao;
+        this.locationDao = locationDao;
     }
 
     @Override
@@ -146,6 +152,32 @@ public class DriverServiceImpl implements DriverService {
                 .collect(Collectors.toList());
 
         return new PageResult<>(resultPage.getTotal(), resultPage.getCurrent(), resultPage.getSize(), voList);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void uploadLocation(Long driverId, DriverLocationUploadDTO dto) {
+        // 1. 更新车辆位置
+        Car car = carDao.selectOne(new LambdaQueryWrapper<Car>().eq(Car::getDriverId, driverId));
+        if (car == null) {
+            throw new BusinessException("未找到该司机驾驶的车辆");
+        }
+        car.setLocation(dto.getLocation());
+        carDao.updateById(car);
+
+        // 2. 如果有运单，记录运单轨迹
+        if (dto.getWaybillId() != null) {
+            // 可选：校验运单是否存在且状态正确
+            Waybill waybill = waybillDao.selectById(dto.getWaybillId());
+            if (waybill != null) {
+                // 插入历史轨迹
+                Location location = new Location();
+                location.setWaybillId(dto.getWaybillId());
+                location.setLocationInfo(dto.getLocation());
+                location.setLocationDate(new Date());
+                locationDao.insert(location);
+            }
+        }
     }
 
     private WaybillVO convertToVO(Waybill waybill) {
