@@ -4,6 +4,7 @@ import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sylphy.common.RedisCache;
 import com.sylphy.common.StringTools;
+import com.sylphy.dto.ConsignorChangeInfoDTO;
 import com.sylphy.dto.ConsignorLoginDTO;
 import com.sylphy.dto.ConsignorRegisterDTO;
 import com.sylphy.entity.model.Consignor;
@@ -16,6 +17,7 @@ import com.sylphy.vo.ConsignorLoginVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * 货主 Service 实现类
@@ -144,6 +146,49 @@ public class ConsignorServiceImpl implements ConsignorService {
 
         // 更新缓存
         redisCache.saveConsignorInfo(consignor);
+        return consignor;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Consignor updateConsignor(Long consignorId, ConsignorChangeInfoDTO changeInfoDTO) {
+        Consignor consignor = consignorDao.selectById(consignorId);
+        if (consignor == null) {
+            throw new BusinessException("货主不存在");
+        }
+
+        // 修改邮箱
+        if (StringUtils.hasText(changeInfoDTO.getEmail())) {
+            // 检查邮箱是否被其他用户占用
+            Consignor exist = consignorDao.selectOne(new LambdaQueryWrapper<Consignor>()
+                    .eq(Consignor::getEmail, changeInfoDTO.getEmail())
+                    .ne(Consignor::getConsignorId, consignorId));
+            if (exist != null) {
+                throw new BusinessException("该邮箱已注册");
+            }
+            consignor.setEmail(changeInfoDTO.getEmail());
+        }
+
+        // 修改密码
+        if (StringUtils.hasText(changeInfoDTO.getNewPassword())) {
+            if (!StringUtils.hasText(changeInfoDTO.getOldPassword())) {
+                throw new BusinessException("修改密码需要提供旧密码");
+            }
+            // 验证旧密码
+            String encryptedOldPassword = DigestUtil.md5Hex(changeInfoDTO.getOldPassword());
+            if (!encryptedOldPassword.equals(consignor.getPassword())) {
+                throw new BusinessException("旧密码错误");
+            }
+            // 设置新密码
+            consignor.setPassword(DigestUtil.md5Hex(changeInfoDTO.getNewPassword()));
+        }
+
+        // 更新数据库
+        consignorDao.updateById(consignor);
+
+        // 更新缓存
+        redisCache.saveConsignorInfo(consignor);
+
         return consignor;
     }
 

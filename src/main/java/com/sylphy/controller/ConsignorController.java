@@ -1,6 +1,8 @@
 package com.sylphy.controller;
 
+import com.sylphy.common.RedisCache;
 import com.sylphy.common.Result;
+import com.sylphy.dto.ConsignorChangeInfoDTO;
 import com.sylphy.dto.ConsignorLoginDTO;
 import com.sylphy.dto.ConsignorRegisterDTO;
 import com.sylphy.entity.model.Consignor;
@@ -22,9 +24,11 @@ import org.springframework.web.bind.annotation.*;
 public class ConsignorController {
 
     private final ConsignorService consignorService;
+    private final RedisCache redisCache;
 
-    public ConsignorController(ConsignorService consignorService) {
+    public ConsignorController(ConsignorService consignorService, RedisCache redisCache) {
         this.consignorService = consignorService;
+        this.redisCache = redisCache;
     }
 
     /**
@@ -61,6 +65,24 @@ public class ConsignorController {
     public Result<Consignor> getCurrentConsignor(@RequestHeader("Authorization") String token) {
         Consignor consignor = consignorService.getConsignorByToken(token);
         // 清空密码字段，不返回给前端
+        consignor.setPassword(null);
+        return Result.success(consignor);
+    }
+    
+    /**
+     * 修改货主信息
+     */
+    @PostMapping("/changeInfo")
+    public Result<Consignor> changeInfo(@RequestHeader("Authorization") String token,
+                                        @Valid @RequestBody ConsignorChangeInfoDTO consignorChangeInfoDTO){
+        Long consignorId = redisCache.getConsignorIdByToken(token);
+        if (consignorId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        redisCache.refreshToken(token);
+
+        Consignor consignor = consignorService.updateConsignor(consignorId, consignorChangeInfoDTO);
+        // 清空密码字段
         consignor.setPassword(null);
         return Result.success(consignor);
     }

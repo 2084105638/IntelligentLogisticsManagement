@@ -1,5 +1,6 @@
 package com.sylphy.service;
 
+import com.sylphy.dto.ConsignorChangeInfoDTO;
 import com.sylphy.dto.ConsignorLoginDTO;
 import com.sylphy.dto.ConsignorRegisterDTO;
 import com.sylphy.entity.model.Consignor;
@@ -42,4 +43,13 @@ public interface ConsignorService {
      * @return 货主信息
      */
     Consignor getConsignorByToken(String token);
+
+    /**
+     * 修改货主信息
+     *
+     * @param consignorId 货主ID
+     * @param changeInfoDTO 修改信息
+     * @return 更新后的货主信息
+     */
+    Consignor updateConsignor(Long consignorId, ConsignorChangeInfoDTO changeInfoDTO);
 }
