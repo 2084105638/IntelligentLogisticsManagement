@@ -5,6 +5,7 @@ import lombok.Data;
 
 @Data
 public class CarCreateDTO {
+    private Long driverId;
     private String location;
     private Integer status;
 }

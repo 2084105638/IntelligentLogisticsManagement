@@ -35,6 +35,7 @@ public class CarServiceImpl implements CarService {
         Car car = new Car();
         car.setLocation(dto.getLocation());
         car.setStatus(dto.getStatus() == null ? 0 : dto.getStatus());
+        car.setDriverId(dto.getDriverId());
         int rows = carDao.insert(car);
         if (rows != 1) {
             throw new BusinessException("创建车辆失败");
