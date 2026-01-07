@@ -356,8 +356,8 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, reactive, ref, onMounted } from 'vue';
+<script setup lang="ts">
+import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
@@ -372,1181 +372,1115 @@ import {
   assignVehicle,
   autoAssignVehicle,
   getDispatcherInfo,
-  DispatcherWaybillQueryDTO,
-  CarCreateDTO,
-  CarUpdateDTO,
-  CarQueryDTO,
+  type DispatcherWaybillQueryDTO,
+  type CarCreateDTO,
+  type CarUpdateDTO,
+  type CarQueryDTO,
   updateCarStatus,
-  WaybillVO,
-  CarVO,
+  type WaybillVO,
+  type CarVO,
   getCarLocation,
-  DriverVO,
-  DriverQueryDTO,
+  type DriverVO,
+  type DriverQueryDTO,
 } from '../api';
 import { clearAuth, getUserInfo } from '../utils/auth';
 import { getStatusDesc, getStatusType, getCarStatusDesc, getCarStatusType } from '../utils/waybillStatus';
 import { AMAP_API_KEY, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from '../config/map';
 
-export default defineComponent({
-  name: 'DispatcherDashboard',
-  setup() {
-    const router = useRouter();
-    const activeTab = ref('waybills');
-    const loading = ref(false);
-    const carLoading = ref(false);
-    const waybillList = ref<WaybillVO[]>([]);
-    const carList = ref<CarVO[]>([]);
-    const driverOptions = ref<Array<DriverVO & { driverId?: number }>>([]);
-    const driverLoading = ref(false);
-    const availableCars = ref<CarVO[]>([]);
-    const waybillPage = ref(1);
-    const waybillPageSize = ref(10);
-    const waybillTotal = ref(0);
-    const carPage = ref(1);
-    const carPageSize = ref(10);
-    const carTotal = ref(0);
-    const userInfo = ref<any>(null);
-    const assignDialogVisible = ref(false);
-    const carDialogVisible = ref(false);
-    const carDialogTitle = ref('新增车辆');
-    const detailDialogVisible = ref(false);
-    const currentWaybill = ref<WaybillVO | null>(null);
-    const carFormRef = ref();
+const router = useRouter();
+const activeTab = ref('waybills');
+const loading = ref(false);
+const carLoading = ref(false);
+const waybillList = ref<WaybillVO[]>([]);
+const carList = ref<CarVO[]>([]);
+const driverOptions = ref<Array<DriverVO & { driverId?: number }>>([]);
+const driverLoading = ref(false);
+const availableCars = ref<CarVO[]>([]);
+const waybillPage = ref(1);
+const waybillPageSize = ref(10);
+const waybillTotal = ref(0);
+const carPage = ref(1);
+const carPageSize = ref(10);
+const carTotal = ref(0);
+const userInfo = ref<any>(null);
+const assignDialogVisible = ref(false);
+const carDialogVisible = ref(false);
+const carDialogTitle = ref('新增车辆');
+const detailDialogVisible = ref(false);
+const currentWaybill = ref<WaybillVO | null>(null);
+const carFormRef = ref();
 
-    const waybillQuery = reactive<DispatcherWaybillQueryDTO>({
-      status: undefined,
-      keyword: '',
-      current: 1,
-      size: 10,
-    });
+const waybillQuery = reactive<DispatcherWaybillQueryDTO>({
+  status: undefined,
+  keyword: '',
+  current: 1,
+  size: 10,
+});
 
-    const carQuery = reactive<CarQueryDTO>({
-      status: undefined,
-      current: 1,
-      size: 10,
-    });
+const carQuery = reactive<CarQueryDTO>({
+  status: undefined,
+  current: 1,
+  size: 10,
+});
 
-    const assignForm = reactive<{
-      waybillId: string;
-      carId: number | null;
-    }>({
-      waybillId: '',
-      carId: null,
-    });
+const assignForm = reactive<{
+  waybillId: string;
+  carId: number | null;
+}>({
+  waybillId: '',
+  carId: null,
+});
 
-    const carForm = reactive<{ driverId: number | null; type: number | null } & Partial<Omit<CarCreateDTO, 'driverId' | 'type'>> & { carId?: number; driverName?: string }>({
-      driverId: null,
-      type: null,
-      location: '',
-      status: 0,
-      driverName: '',
-    });
+const carForm = reactive<{ driverId: number | null; type: number | null } & Partial<Omit<CarCreateDTO, 'driverId' | 'type'>> & { carId?: number; driverName?: string }>({
+  driverId: null,
+  type: null,
+  location: '',
+  status: 0,
+  driverName: '',
+});
 
-    const carRules = {
-      driverId: [{ required: true, message: '请选择司机', trigger: 'change' }],
-      type: [{ required: true, message: '请选择车辆类型', trigger: 'change' }],
-    };
+const carRules = {
+  driverId: [{ required: true, message: '请选择司机', trigger: 'change' }],
+  type: [{ required: true, message: '请选择车辆类型', trigger: 'change' }],
+};
 
-    const statistics = reactive({
-      totalWaybills: 0,
-      completedWaybills: 0,
-      onTimeRate: 0,
-      totalCars: 0,
-    });
+const statistics = reactive({
+  totalWaybills: 0,
+  completedWaybills: 0,
+  onTimeRate: 0,
+  totalCars: 0,
+});
 
-    // 地图相关
-    const selectedCarId = ref<number | null>(null);
-    let mapInstance: any = null;
-    let markers: any[] = [];
-    // 车辆位置选择地图
-    let carLocationMapInstance: any = null;
-    let carLocationMarker: any = null;
-    const carLocationMapVisible = ref(false);
-    const carLocationName = ref('');
+// 地图相关
+const selectedCarId = ref<number | null>(null);
+let mapInstance: any = null;
+let markers: any[] = [];
+// 车辆位置选择地图
+let carLocationMapInstance: any = null;
+let carLocationMarker: any = null;
+const carLocationMapVisible = ref(false);
+const carLocationName = ref('');
 
-    onMounted(() => {
-      loadUserInfo();
-      loadWaybills();
-      loadCars();
-      loadDrivers();
-      loadStatistics();
-      // 延迟加载地图，确保DOM已渲染
-      setTimeout(() => {
-        initMap();
-      }, 500);
-    });
+onMounted(() => {
+  loadUserInfo();
+  loadWaybills();
+  loadCars();
+  loadDrivers();
+  loadStatistics();
+  // 延迟加载地图，确保DOM已渲染
+  setTimeout(() => {
+    initMap();
+  }, 500);
+});
 
-    // 查询司机列表（全部或按关键字），使用调度员权限接口
-    const loadDrivers = async (keyword = '') => {
-      try {
-        driverLoading.value = true;
-        const params: DriverQueryDTO = { current: 1, size: 500 };
-        if (keyword) params.keyword = keyword;
-        const result = await queryDriversForDispatcher(params);
-        const pageData = result.data as any;
-        const records = (pageData.records || []) as DriverVO[];
-        driverOptions.value = records.map((d) => ({
-          ...d,
-          driverId: d.driverId || (d as any).userId,
-        }));
-      } catch (error: any) {
-        console.warn('加载司机列表失败（仅影响选择司机）：', error?.message || error);
-      } finally {
-        driverLoading.value = false;
-      }
-    };
+// 查询司机列表（全部或按关键字），使用调度员权限接口
+const loadDrivers = async (keyword = '') => {
+  try {
+    driverLoading.value = true;
+    const params: DriverQueryDTO = { current: 1, size: 500 };
+    if (keyword) params.keyword = keyword;
+    const result = await queryDriversForDispatcher(params);
+    const pageData = result.data as any;
+    const records = (pageData.records || []) as DriverVO[];
+    driverOptions.value = records.map((d) => ({
+      ...d,
+      driverId: d.driverId || (d as any).userId,
+    }));
+  } catch (error: any) {
+    console.warn('加载司机列表失败（仅影响选择司机）：', error?.message || error);
+  } finally {
+    driverLoading.value = false;
+  }
+};
 
-    const remoteSearchDrivers = (query: string) => {
-      loadDrivers(query);
-    };
+const remoteSearchDrivers = (query: string) => {
+  loadDrivers(query);
+};
 
-    const formatDriverOption = (item: DriverVO & { driverId?: number }) => {
-      const id = item.driverId || (item as any).userId;
-      const name = (item as any).name || (item as any).username || '无用户名';
-      const phone = item.phone ? ` / ${item.phone}` : '';
-      return `ID:${id} / ${name}${phone}`;
-    };
+const formatDriverOption = (item: DriverVO & { driverId?: number }) => {
+  const id = item.driverId || (item as any).userId;
+  const name = (item as any).name || (item as any).username || '无用户名';
+  const phone = item.phone ? ` / ${item.phone}` : '';
+  return `ID:${id} / ${name}${phone}`;
+};
 
-    const loadUserInfo = async () => {
-      try {
-        const info = getUserInfo();
-        userInfo.value = info;
-        const result = await getDispatcherInfo();
-        if (result.data) {
-          userInfo.value = { ...userInfo.value, ...result.data };
-        }
-      } catch (error) {
-        console.error('加载用户信息失败:', error);
-      }
-    };
+const loadUserInfo = async () => {
+  try {
+    const info = getUserInfo();
+    userInfo.value = info;
+    const result = await getDispatcherInfo();
+    if (result.data) {
+      userInfo.value = { ...userInfo.value, ...result.data };
+    }
+  } catch (error) {
+    console.error('加载用户信息失败:', error);
+  }
+};
 
-    const handleTabChange = (tab: string) => {
-      if (tab === 'waybills') {
-        loadWaybills();
-      } else if (tab === 'cars') {
-        loadCars();
-      } else if (tab === 'statistics') {
-        loadStatistics();
-      } else if (tab === 'monitor') {
-        // 切换到地图标签页时，确保车辆数据已加载，然后初始化地图并加载车辆位置
-        if (carList.value.length === 0) {
-          loadCars().then(() => {
-            setTimeout(() => {
-              if (!mapInstance) {
-                initMap();
-              } else {
-                refreshMap();
-              }
-            }, 300);
-          });
-        } else {
-          setTimeout(() => {
-            if (!mapInstance) {
-              initMap();
-            } else {
-              refreshMap();
-            }
-          }, 100);
-        }
-      }
-    };
-
-    const loadWaybills = async () => {
-      loading.value = true;
-      try {
-        waybillQuery.current = waybillPage.value;
-        waybillQuery.size = waybillPageSize.value;
-        const result = await dispatcherQueryWaybills(waybillQuery);
-        if (result.data) {
-          const pageData = result.data as any;
-          const records: any[] = pageData.records || [];
-          // 1) 过滤掉明确标记为 changed=1 的旧单
-          const filtered = records.filter((w) => w.changed === 0 || w.changed === undefined);
-          // 2) 按业务字段去重，保留"最新且状态优先"的一条
-          const dedupMap = new Map<string, any>();
-          filtered.forEach((w) => {
-            const key = [
-              w.goodsInformation,
-              w.startAddress,
-              w.endAddress,
-              w.expectedTimeLimit,
-              w.cost,
-            ].join('|');
-            const prev = dedupMap.get(key);
-            if (!prev) {
-              dedupMap.set(key, w);
-              return;
-            }
-            const statusPriority = (s: number) => {
-              if (s === 1 || s === 2 || s === 3) return 2;
-              return 1;
-            };
-            const prevPri = statusPriority(prev.status);
-            const curPri = statusPriority(w.status);
-            if (curPri > prevPri) {
-              dedupMap.set(key, w);
-              return;
-            }
-            if (curPri === prevPri) {
-              const prevTime = new Date(prev.createTime).getTime();
-              const curTime = new Date(w.createTime).getTime();
-              if (curTime >= prevTime) {
-                dedupMap.set(key, w);
-              }
-            }
-          });
-          waybillList.value = Array.from(dedupMap.values());
-          waybillTotal.value = waybillList.value.length;
-        }
-      } catch (error: any) {
-        // 只在真正严重错误时显示提示（如401、403等），其他错误静默处理
-        if (error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('登录')) {
-          ElMessage.error(error.message || '加载运单列表失败');
-        } else {
-          console.warn('加载运单列表失败:', error.message || error);
-          // 如果已有数据，不清空，保持显示
-          if (waybillList.value.length === 0) {
-            ElMessage.warning('加载运单列表失败，请稍后重试');
-          }
-        }
-      } finally {
-        loading.value = false;
-      }
-    };
-
-    // 批量逆地理编码车辆位置
-    const batchReverseGeocodeCars = async (cars: any[]) => {
-      const apiKey = String(AMAP_API_KEY);
-      const promises = cars.map(async (car) => {
-        if (!car.location) return;
-        
-        const match = car.location.match(/([\d.]+),\s*([\d.]+)/);
-        if (!match) return;
-        
-        const lat = match[1];
-        const lng = match[2];
-        const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
-        
-        try {
-          const response = await fetch(url);
-          const data = await response.json();
-          
-          if (data.status === '1' && data.regeocode) {
-            car.locationName = data.regeocode.formatted_address || '未知地址';
-          }
-        } catch (error) {
-          console.warn(`车辆 ${car.carId} 位置查询失败:`, error);
-        }
-      });
-      
-      await Promise.all(promises);
-    };
-
-    const loadCars = async () => {
-      carLoading.value = true;
-      try {
-        carQuery.current = carPage.value;
-        carQuery.size = carPageSize.value;
-        const result = await queryCars(carQuery);
-        if (result.data) {
-          const pageData = result.data as any;
-          carList.value = pageData.records || [];
-          carTotal.value = pageData.total || 0;
-          // 获取可用车辆用于派单
-          availableCars.value = carList.value.filter((car) => car.status === 0);
-          
-          // 自动批量查询所有有坐标的车辆的位置名称
-          await batchReverseGeocodeCars(carList.value);
-        }
-      } catch (error: any) {
-        // 只在真正严重错误时显示提示（如401、403等），其他错误静默处理
-        if (error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('登录')) {
-          ElMessage.error(error.message || '加载车辆列表失败');
-        } else {
-          console.warn('加载车辆列表失败:', error.message || error);
-          // 如果已有数据，不清空，保持显示
-          if (carList.value.length === 0) {
-            ElMessage.warning('加载车辆列表失败，请稍后重试');
-          }
-        }
-      } finally {
-        carLoading.value = false;
-      }
-    };
-
-    const loadStatistics = async () => {
-      // 模拟统计数据
-      statistics.totalWaybills = waybillTotal.value;
-      statistics.completedWaybills = waybillList.value.filter((w) => w.status === 3).length;
-      statistics.onTimeRate = 95;
-      statistics.totalCars = carTotal.value;
-    };
-
-    const viewWaybillDetail = async (row: WaybillVO) => {
-      try {
-        const result = await dispatcherGetWaybill(row.waybillId);
-        if (result.data) {
-          currentWaybill.value = result.data as unknown as WaybillVO;
-          detailDialogVisible.value = true;
-        }
-      } catch (error: any) {
-        ElMessage.error(error.message || '获取运单详情失败');
-      }
-    };
-
-    const showAssignDialog = (row: WaybillVO) => {
-      currentWaybill.value = row; // 设置当前运单以便显示 waybillIdentification
-      assignForm.waybillId = row.waybillId; // 保留 waybillId 用于API调用
-      assignForm.carId = null;
-      // 重新加载可用车辆
-      loadCars();
-      assignDialogVisible.value = true;
-    };
-
-    const confirmAssign = async () => {
-      if (assignForm.carId === null || assignForm.carId === undefined) {
-        ElMessage.warning('请选择车辆');
-        return;
-      }
-      try {
-        await assignVehicle(assignForm.waybillId, assignForm.carId);
-        ElMessage.success('派单成功');
-        assignDialogVisible.value = false;
-        loadWaybills();
-        loadCars();
-      } catch (error: any) {
-        ElMessage.error(error.message || '派单失败');
-      }
-    };
-
-    const autoAssign = async (row: WaybillVO) => {
-      try {
-        await ElMessageBox.confirm('系统将自动匹配最优车辆，是否继续？', '智能调度', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'info',
-        });
-        await autoAssignVehicle(row.waybillId);
-        ElMessage.success('智能调度成功');
-        loadWaybills();
-        loadCars();
-      } catch (error: any) {
-        if (error !== 'cancel') {
-          ElMessage.error(error.message || '智能调度失败');
-        }
-      }
-    };
-
-    const showCarDialog = () => {
-      loadDrivers();
-      carDialogTitle.value = '新增车辆';
-      Object.keys(carForm).forEach((key) => {
-        if (key === 'carId') {
-          delete (carForm as any)[key];
-        } else if (key === 'status') {
-          (carForm as any)[key] = 0;
-        } else {
-          (carForm as any)[key] = key === 'driverId' ? null : '';
-        }
-      });
-      carLocationName.value = '';
-      carLocationMapVisible.value = false;
-      carDialogVisible.value = true;
-    };
-
-    const editCar = (row: CarVO) => {
-      loadDrivers();
-      carDialogTitle.value = '编辑车辆';
-      carForm.carId = row.carId;
-      carForm.driverId = row.driverId;
-      // 如果后端返回了类型编码，带入表单；否则置为空
-      carForm.type = (row as any).type ?? null;
-      carForm.driverName = row.driverName || '';
-      carForm.location = row.location;
-      carForm.status = row.status;
-      carLocationName.value = '';
-      carLocationMapVisible.value = false;
-      carDialogVisible.value = true;
-      
-      // 如果已有位置且是坐标格式，自动查询地址名称
-      if (carForm.location && carForm.location.match(/^[\d.]+,\s*[\d.]+$/)) {
+const handleTabChange = (tab: string) => {
+  if (tab === 'waybills') {
+    loadWaybills();
+  } else if (tab === 'cars') {
+    loadCars();
+  } else if (tab === 'statistics') {
+    loadStatistics();
+  } else if (tab === 'monitor') {
+    // 切换到地图标签页时，确保车辆数据已加载，然后初始化地图并加载车辆位置
+    if (carList.value.length === 0) {
+      loadCars().then(() => {
         setTimeout(() => {
-          reverseGeocodeCarLocation();
-        }, 500);
-      }
-    };
-
-    // 初始化车辆位置选择地图
-    const initCarLocationMap = () => {
-      // 先显示地图容器
-      carLocationMapVisible.value = true;
-
-      // 等待DOM更新后再初始化地图
+          if (!mapInstance) {
+            initMap();
+          } else {
+            refreshMap();
+          }
+        }, 300);
+      });
+    } else {
       setTimeout(() => {
-        const container = document.getElementById('carLocationMapContainer');
-        if (!container) {
-          ElMessage.warning('地图容器不存在，请稍后重试');
-          carLocationMapVisible.value = false;
+        if (!mapInstance) {
+          initMap();
+        } else {
+          refreshMap();
+        }
+      }, 100);
+    }
+  }
+};
+
+const loadWaybills = async () => {
+  loading.value = true;
+  try {
+    waybillQuery.current = waybillPage.value;
+    waybillQuery.size = waybillPageSize.value;
+    const result = await dispatcherQueryWaybills(waybillQuery);
+    if (result.data) {
+      const pageData = result.data as any;
+      const records: any[] = pageData.records || [];
+      // 1) 过滤掉明确标记为 changed=1 的旧单
+      const filtered = records.filter((w) => w.changed === 0 || w.changed === undefined);
+      // 2) 按业务字段去重，保留"最新且状态优先"的一条
+      const dedupMap = new Map<string, any>();
+      filtered.forEach((w) => {
+        const key = [
+          w.goodsInformation,
+          w.startAddress,
+          w.endAddress,
+          w.expectedTimeLimit,
+          w.cost,
+        ].join('|');
+        const prev = dedupMap.get(key);
+        if (!prev) {
+          dedupMap.set(key, w);
           return;
         }
-
-        if (typeof (window as any).AMap === 'undefined') {
-          const apiKey = String(AMAP_API_KEY);
-          if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
-            ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
-            carLocationMapVisible.value = false;
-            return;
-          }
-          const script = document.createElement('script');
-          script.type = 'text/javascript';
-          script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&callback=initCarLocationAMap`;
-          script.async = true;
-          (window as any).initCarLocationAMap = () => {
-            createCarLocationMapInstance();
-          };
-          document.head.appendChild(script);
-        } else {
-          createCarLocationMapInstance();
+        const statusPriority = (s: number) => {
+          if (s === 1 || s === 2 || s === 3) return 2;
+          return 1;
+        };
+        const prevPri = statusPriority(prev.status);
+        const curPri = statusPriority(w.status);
+        if (curPri > prevPri) {
+          dedupMap.set(key, w);
+          return;
         }
-      }, 300); // 增加等待时间，确保对话框和DOM完全渲染
-    };
-
-    // 创建车辆位置选择地图实例
-    const createCarLocationMapInstance = () => {
-      const container = document.getElementById('carLocationMapContainer');
-      if (!container) return;
-
-      try {
-        // 如果已有实例，先销毁
-        if (carLocationMapInstance) {
-          carLocationMapInstance.destroy();
-          carLocationMapInstance = null;
-          carLocationMarker = null;
-        }
-
-        // 解析当前位置（如果有）
-        let center: [number, number] = DEFAULT_MAP_CENTER;
-        if (carForm.location) {
-          const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
-          if (match) {
-            center = [parseFloat(match[2]), parseFloat(match[1])]; // [lng, lat]
+        if (curPri === prevPri) {
+          const prevTime = new Date(prev.createTime).getTime();
+          const curTime = new Date(w.createTime).getTime();
+          if (curTime >= prevTime) {
+            dedupMap.set(key, w);
           }
         }
+      });
+      waybillList.value = Array.from(dedupMap.values());
+      waybillTotal.value = waybillList.value.length;
+    }
+  } catch (error: any) {
+    // 只在真正严重错误时显示提示（如401、403等），其他错误静默处理
+    if (error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('登录')) {
+      ElMessage.error(error.message || '加载运单列表失败');
+    } else {
+      console.warn('加载运单列表失败:', error.message || error);
+      // 如果已有数据，不清空，保持显示
+      if (waybillList.value.length === 0) {
+        ElMessage.warning('加载运单列表失败，请稍后重试');
+      }
+    }
+  } finally {
+    loading.value = false;
+  }
+};
 
-        carLocationMapInstance = new (window as any).AMap.Map('carLocationMapContainer', {
-          zoom: 13,
-          center: center,
+// 批量逆地理编码车辆位置
+const batchReverseGeocodeCars = async (cars: any[]) => {
+  const apiKey = String(AMAP_API_KEY);
+  const promises = cars.map(async (car) => {
+    if (!car.location) return;
+    
+    const match = car.location.match(/([\d.]+),\s*([\d.]+)/);
+    if (!match) return;
+    
+    const lat = match[1];
+    const lng = match[2];
+    const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+    
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === '1' && data.regeocode) {
+        car.locationName = data.regeocode.formatted_address || '未知地址';
+      }
+    } catch (error) {
+      console.warn(`车辆 ${car.carId} 位置查询失败:`, error);
+    }
+  });
+  
+  await Promise.all(promises);
+};
+
+const loadCars = async () => {
+  carLoading.value = true;
+  try {
+    carQuery.current = carPage.value;
+    carQuery.size = carPageSize.value;
+    const result = await queryCars(carQuery);
+    if (result.data) {
+      const pageData = result.data as any;
+      carList.value = pageData.records || [];
+      carTotal.value = pageData.total || 0;
+      // 获取可用车辆用于派单
+      availableCars.value = carList.value.filter((car) => car.status === 0);
+      
+      // 自动批量查询所有有坐标的车辆的位置名称
+      await batchReverseGeocodeCars(carList.value);
+    }
+  } catch (error: any) {
+    // 只在真正严重错误时显示提示（如401、403等），其他错误静默处理
+    if (error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('登录')) {
+      ElMessage.error(error.message || '加载车辆列表失败');
+    } else {
+      console.warn('加载车辆列表失败:', error.message || error);
+      // 如果已有数据，不清空，保持显示
+      if (carList.value.length === 0) {
+        ElMessage.warning('加载车辆列表失败，请稍后重试');
+      }
+    }
+  } finally {
+    carLoading.value = false;
+  }
+};
+
+const loadStatistics = async () => {
+  // 模拟统计数据
+  statistics.totalWaybills = waybillTotal.value;
+  statistics.completedWaybills = waybillList.value.filter((w) => w.status === 3).length;
+  statistics.onTimeRate = 95;
+  statistics.totalCars = carTotal.value;
+};
+
+const viewWaybillDetail = async (row: WaybillVO) => {
+  try {
+    const result = await dispatcherGetWaybill(row.waybillId);
+    if (result.data) {
+      currentWaybill.value = result.data as unknown as WaybillVO;
+      detailDialogVisible.value = true;
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取运单详情失败');
+  }
+};
+
+const showAssignDialog = (row: WaybillVO) => {
+  currentWaybill.value = row; // 设置当前运单以便显示 waybillIdentification
+  assignForm.waybillId = row.waybillId; // 保留 waybillId 用于API调用
+  assignForm.carId = null;
+  // 重新加载可用车辆
+  loadCars();
+  assignDialogVisible.value = true;
+};
+
+const confirmAssign = async () => {
+  if (assignForm.carId === null || assignForm.carId === undefined) {
+    ElMessage.warning('请选择车辆');
+    return;
+  }
+  try {
+    await assignVehicle(assignForm.waybillId, assignForm.carId);
+    ElMessage.success('派单成功');
+    assignDialogVisible.value = false;
+    loadWaybills();
+    loadCars();
+  } catch (error: any) {
+    ElMessage.error(error.message || '派单失败');
+  }
+};
+
+const autoAssign = async (row: WaybillVO) => {
+  try {
+    await ElMessageBox.confirm('系统将自动匹配最优车辆，是否继续？', '智能调度', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'info',
+    });
+    await autoAssignVehicle(row.waybillId);
+    ElMessage.success('智能调度成功');
+    loadWaybills();
+    loadCars();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '智能调度失败');
+    }
+  }
+};
+
+const showCarDialog = () => {
+  loadDrivers();
+  carDialogTitle.value = '新增车辆';
+  Object.keys(carForm).forEach((key) => {
+    if (key === 'carId') {
+      delete (carForm as any)[key];
+    } else if (key === 'status') {
+      (carForm as any)[key] = 0;
+    } else {
+      (carForm as any)[key] = key === 'driverId' ? null : '';
+    }
+  });
+  carLocationName.value = '';
+  carLocationMapVisible.value = false;
+  carDialogVisible.value = true;
+};
+
+const editCar = (row: CarVO) => {
+  loadDrivers();
+  carDialogTitle.value = '编辑车辆';
+  carForm.carId = row.carId;
+  carForm.driverId = row.driverId;
+  // 如果后端返回了类型编码，带入表单；否则置为空
+  carForm.type = (row as any).type ?? null;
+  carForm.driverName = row.driverName || '';
+  carForm.location = row.location;
+  carForm.status = row.status;
+  carLocationName.value = '';
+  carLocationMapVisible.value = false;
+  carDialogVisible.value = true;
+  
+  // 如果已有位置且是坐标格式，自动查询地址名称
+  if (carForm.location && carForm.location.match(/^[\d.]+,\s*[\d.]+$/)) {
+    setTimeout(() => {
+      reverseGeocodeCarLocation();
+    }, 500);
+  }
+};
+
+// 初始化车辆位置选择地图
+const initCarLocationMap = () => {
+  // 先显示地图容器
+  carLocationMapVisible.value = true;
+
+  // 等待DOM更新后再初始化地图
+  setTimeout(() => {
+    const container = document.getElementById('carLocationMapContainer');
+    if (!container) {
+      ElMessage.warning('地图容器不存在，请稍后重试');
+      carLocationMapVisible.value = false;
+      return;
+    }
+
+    if (typeof (window as any).AMap === 'undefined') {
+      const apiKey = String(AMAP_API_KEY);
+      if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
+        ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
+        carLocationMapVisible.value = false;
+        return;
+      }
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&callback=initCarLocationAMap`;
+      script.async = true;
+      (window as any).initCarLocationAMap = () => {
+        createCarLocationMapInstance();
+      };
+      document.head.appendChild(script);
+    } else {
+      createCarLocationMapInstance();
+    }
+  }, 300); // 增加等待时间，确保对话框和DOM完全渲染
+};
+
+// 创建车辆位置选择地图实例
+const createCarLocationMapInstance = () => {
+  const container = document.getElementById('carLocationMapContainer');
+  if (!container) return;
+
+  try {
+    // 如果已有实例，先销毁
+    if (carLocationMapInstance) {
+      carLocationMapInstance.destroy();
+      carLocationMapInstance = null;
+      carLocationMarker = null;
+    }
+
+    // 解析当前位置（如果有）
+    let center: [number, number] = DEFAULT_MAP_CENTER;
+    if (carForm.location) {
+      const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
+      if (match) {
+        center = [parseFloat(match[2]), parseFloat(match[1])]; // [lng, lat]
+      }
+    }
+
+    carLocationMapInstance = new (window as any).AMap.Map('carLocationMapContainer', {
+      zoom: 13,
+      center: center,
+    });
+
+    // 如果已有位置，显示标记
+    if (carForm.location && carForm.location.match(/^[\d.]+,\s*[\d.]+$/)) {
+      const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
+      if (match) {
+        const lat = parseFloat(match[1]);
+        const lng = parseFloat(match[2]);
+        carLocationMarker = new (window as any).AMap.Marker({
+          position: [lng, lat],
+          draggable: true,
         });
-
-        // 如果已有位置，显示标记
-        if (carForm.location && carForm.location.match(/^[\d.]+,\s*[\d.]+$/)) {
-          const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
-          if (match) {
-            const lat = parseFloat(match[1]);
-            const lng = parseFloat(match[2]);
-            carLocationMarker = new (window as any).AMap.Marker({
-              position: [lng, lat],
-              draggable: true,
-            });
-            carLocationMarker.setMap(carLocationMapInstance);
-            carLocationMapInstance.setCenter([lng, lat]);
-            
-            // 标记拖拽事件
-            carLocationMarker.on('dragend', () => {
-              const position = carLocationMarker.getPosition();
-              const lat = position.getLat();
-              const lng = position.getLng();
-              carForm.location = `${lat},${lng}`;
-              carLocationName.value = '';
-            });
-          }
-        }
-
-        // 地图点击事件
-        carLocationMapInstance.on('click', (e: any) => {
-          const lng = e.lnglat.getLng();
-          const lat = e.lnglat.getLat();
+        carLocationMarker.setMap(carLocationMapInstance);
+        carLocationMapInstance.setCenter([lng, lat]);
+        
+        // 标记拖拽事件
+        carLocationMarker.on('dragend', () => {
+          const position = carLocationMarker.getPosition();
+          const lat = position.getLat();
+          const lng = position.getLng();
           carForm.location = `${lat},${lng}`;
           carLocationName.value = '';
-
-          // 移除旧标记
-          if (carLocationMarker) {
-            carLocationMapInstance.remove(carLocationMarker);
-          }
-
-          // 添加新标记
-          carLocationMarker = new (window as any).AMap.Marker({
-            position: [lng, lat],
-            draggable: true,
-          });
-          carLocationMarker.setMap(carLocationMapInstance);
-
-          // 标记拖拽事件
-          carLocationMarker.on('dragend', () => {
-            const position = carLocationMarker.getPosition();
-            const lat = position.getLat();
-            const lng = position.getLng();
-            carForm.location = `${lat},${lng}`;
-            carLocationName.value = '';
-          });
-
-          ElMessage.success(`已选择位置: ${lat}, ${lng}`);
         });
-      } catch (error) {
-        console.error('地图初始化失败:', error);
-        ElMessage.warning('地图初始化失败，请检查高德地图API配置');
       }
-    };
+    }
 
-    // 清除车辆位置
-    const clearCarLocation = () => {
-      carForm.location = '';
+    // 地图点击事件
+    carLocationMapInstance.on('click', (e: any) => {
+      const lng = e.lnglat.getLng();
+      const lat = e.lnglat.getLat();
+      carForm.location = `${lat},${lng}`;
       carLocationName.value = '';
+
+      // 移除旧标记
       if (carLocationMarker) {
-        carLocationMapInstance?.remove(carLocationMarker);
-        carLocationMarker = null;
-      }
-      ElMessage.info('已清除位置');
-    };
-
-    // 逆地理编码：将坐标转换为地址
-    const reverseGeocodeCarLocation = async () => {
-      if (!carForm.location) {
-        ElMessage.warning('请先选择位置');
-        return;
+        carLocationMapInstance.remove(carLocationMarker);
       }
 
-      const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
-      if (!match) {
-        ElMessage.warning('位置格式不正确，应为 lat,lng');
-        return;
-      }
-
-      const lat = match[1];
-      const lng = match[2];
-      const apiKey = String(AMAP_API_KEY);
-      const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
-
-      try {
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (data.status === '1' && data.regeocode) {
-          carLocationName.value = data.regeocode.formatted_address || '未知地址';
-          ElMessage.success('位置查询成功');
-        } else {
-          ElMessage.warning('位置查询失败: ' + (data.info || '未知错误'));
-        }
-      } catch (error: any) {
-        console.error('逆地理编码失败:', error);
-        ElMessage.error('位置查询失败: ' + (error.message || '未知错误'));
-      }
-    };
-
-    // 在列表中逆地理编码车辆位置
-    const reverseGeocodeCarLocationInList = async (car: any) => {
-      if (!car.location) {
-        ElMessage.warning('该车辆没有位置信息');
-        return;
-      }
-
-      const match = car.location.match(/([\d.]+),\s*([\d.]+)/);
-      if (!match) {
-        ElMessage.warning('位置格式不正确');
-        return;
-      }
-
-      const lat = match[1];
-      const lng = match[2];
-      const apiKey = String(AMAP_API_KEY);
-      const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
-
-      try {
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (data.status === '1' && data.regeocode) {
-          car.locationName = data.regeocode.formatted_address || '未知地址';
-          ElMessage.success('位置查询成功');
-        } else {
-          ElMessage.warning('位置查询失败: ' + (data.info || '未知错误'));
-        }
-      } catch (error: any) {
-        console.error('逆地理编码失败:', error);
-        ElMessage.error('位置查询失败: ' + (error.message || '未知错误'));
-      }
-    };
-
-    const saveCar = async () => {
-      if (!carFormRef.value) return;
-      await carFormRef.value.validate(async (valid: boolean) => {
-        if (valid) {
-          try {
-            if (carForm.carId) {
-              const updateData: CarUpdateDTO = {
-                carId: carForm.carId,
-                driverId: carForm.driverId ?? 0,
-                type: carForm.type ?? undefined,
-                location: carForm.location,
-                status: carForm.status,
-              };
-              await updateCar(carForm.carId, updateData);
-              ElMessage.success('更新成功');
-            } else {
-              const createData: CarCreateDTO = {
-                driverId: carForm.driverId ?? 0,
-                type: carForm.type ?? 0,
-                location: carForm.location || '',
-                status: carForm.status ?? 0,
-              };
-              await createCar(createData);
-              ElMessage.success('创建成功');
-            }
-            carDialogVisible.value = false;
-            loadCars();
-          } catch (error: any) {
-            ElMessage.error(error.message || '保存失败');
-          }
-        }
+      // 添加新标记
+      carLocationMarker = new (window as any).AMap.Marker({
+        position: [lng, lat],
+        draggable: true,
       });
-    };
+      carLocationMarker.setMap(carLocationMapInstance);
 
-    const deleteCar = async (carId: number) => {
+      // 标记拖拽事件
+      carLocationMarker.on('dragend', () => {
+        const position = carLocationMarker.getPosition();
+        const lat = position.getLat();
+        const lng = position.getLng();
+        carForm.location = `${lat},${lng}`;
+        carLocationName.value = '';
+      });
+
+      ElMessage.success(`已选择位置: ${lat}, ${lng}`);
+    });
+  } catch (error) {
+    console.error('地图初始化失败:', error);
+    ElMessage.warning('地图初始化失败，请检查高德地图API配置');
+  }
+};
+
+// 清除车辆位置
+const clearCarLocation = () => {
+  carForm.location = '';
+  carLocationName.value = '';
+  if (carLocationMarker) {
+    carLocationMapInstance?.remove(carLocationMarker);
+    carLocationMarker = null;
+  }
+  ElMessage.info('已清除位置');
+};
+
+// 逆地理编码：将坐标转换为地址
+const reverseGeocodeCarLocation = async () => {
+  if (!carForm.location) {
+    ElMessage.warning('请先选择位置');
+    return;
+  }
+
+  const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
+  if (!match) {
+    ElMessage.warning('位置格式不正确，应为 lat,lng');
+    return;
+  }
+
+  const lat = match[1];
+  const lng = match[2];
+  const apiKey = String(AMAP_API_KEY);
+  const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.status === '1' && data.regeocode) {
+      carLocationName.value = data.regeocode.formatted_address || '未知地址';
+      ElMessage.success('位置查询成功');
+    } else {
+      ElMessage.warning('位置查询失败: ' + (data.info || '未知错误'));
+    }
+  } catch (error: any) {
+    console.error('逆地理编码失败:', error);
+    ElMessage.error('位置查询失败: ' + (error.message || '未知错误'));
+  }
+};
+
+// 在列表中逆地理编码车辆位置
+const reverseGeocodeCarLocationInList = async (car: any) => {
+  if (!car.location) {
+    ElMessage.warning('该车辆没有位置信息');
+    return;
+  }
+
+  const match = car.location.match(/([\d.]+),\s*([\d.]+)/);
+  if (!match) {
+    ElMessage.warning('位置格式不正确');
+    return;
+  }
+
+  const lat = match[1];
+  const lng = match[2];
+  const apiKey = String(AMAP_API_KEY);
+  const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.status === '1' && data.regeocode) {
+      car.locationName = data.regeocode.formatted_address || '未知地址';
+      ElMessage.success('位置查询成功');
+    } else {
+      ElMessage.warning('位置查询失败: ' + (data.info || '未知错误'));
+    }
+  } catch (error: any) {
+    console.error('逆地理编码失败:', error);
+    ElMessage.error('位置查询失败: ' + (error.message || '未知错误'));
+  }
+};
+
+const saveCar = async () => {
+  if (!carFormRef.value) return;
+  await carFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
       try {
-        await ElMessageBox.confirm('确定要删除该车辆吗？', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning',
-        });
-        await deleteCarAPI(carId);
-        ElMessage.success('删除成功');
+        if (carForm.carId) {
+          const updateData: CarUpdateDTO = {
+            carId: carForm.carId,
+            driverId: carForm.driverId ?? 0,
+            type: carForm.type ?? undefined,
+            location: carForm.location,
+            status: carForm.status,
+          };
+          await updateCar(carForm.carId, updateData);
+          ElMessage.success('更新成功');
+        } else {
+          const createData: CarCreateDTO = {
+            driverId: carForm.driverId ?? 0,
+            type: carForm.type ?? 0,
+            location: carForm.location || '',
+            status: carForm.status ?? 0,
+          };
+          await createCar(createData);
+          ElMessage.success('创建成功');
+        }
+        carDialogVisible.value = false;
         loadCars();
       } catch (error: any) {
-        if (error !== 'cancel') {
-          ElMessage.error(error.message || '删除失败');
-        }
+        ElMessage.error(error.message || '保存失败');
       }
+    }
+  });
+};
+
+const deleteCar = async (carId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该车辆吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    });
+    await deleteCarAPI(carId);
+    ElMessage.success('删除成功');
+    loadCars();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除失败');
+    }
+  }
+};
+
+const releaseCar = async (carId: number) => {
+  try {
+    await ElMessageBox.confirm('确认将该车辆状态改为“可用”吗？', '释放车辆', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    });
+    await updateCarStatus(carId, 0);
+    ElMessage.success('车辆已释放为可用');
+    loadCars();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '释放车辆失败');
+    }
+  }
+};
+
+// 初始化地图
+const initMap = () => {
+  const container = document.getElementById('monitorMapContainer');
+  if (!container) {
+    console.warn('地图容器不存在');
+    return;
+  }
+
+  // 检查是否已加载高德地图API
+  if (typeof (window as any).AMap === 'undefined') {
+    const apiKey = String(AMAP_API_KEY);
+    if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
+      ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
+      return;
+    }
+    // 动态加载高德地图API（包含地理编码服务）
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geocoder&callback=initAMap`;
+    script.async = true;
+    (window as any).initAMap = () => {
+      createMapInstance();
     };
+    document.head.appendChild(script);
+  } else {
+    createMapInstance();
+  }
+};
 
-    const releaseCar = async (carId: number) => {
-      try {
-        await ElMessageBox.confirm('确认将该车辆状态改为“可用”吗？', '释放车辆', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning',
-        });
-        await updateCarStatus(carId, 0);
-        ElMessage.success('车辆已释放为可用');
-        loadCars();
-      } catch (error: any) {
-        if (error !== 'cancel') {
-          ElMessage.error(error.message || '释放车辆失败');
-        }
-      }
-    };
+// 创建地图实例
+const createMapInstance = () => {
+  const container = document.getElementById('monitorMapContainer');
+  if (!container) return;
 
-    // 初始化地图
-    const initMap = () => {
-      const container = document.getElementById('monitorMapContainer');
-      if (!container) {
-        console.warn('地图容器不存在');
-        return;
-      }
+  try {
+    mapInstance = new (window as any).AMap.Map('monitorMapContainer', {
+      zoom: DEFAULT_MAP_ZOOM,
+      center: DEFAULT_MAP_CENTER,
+    });
+    refreshMap();
+  } catch (error) {
+    console.error('地图初始化失败:', error);
+    ElMessage.warning('地图初始化失败，请检查高德地图API配置');
+  }
+};
 
-      // 检查是否已加载高德地图API
-      if (typeof (window as any).AMap === 'undefined') {
-        const apiKey = String(AMAP_API_KEY);
-        if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
-          ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
-          return;
-        }
-        // 动态加载高德地图API（包含地理编码服务）
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geocoder&callback=initAMap`;
-        script.async = true;
-        (window as any).initAMap = () => {
-          createMapInstance();
-        };
-        document.head.appendChild(script);
-      } else {
-        createMapInstance();
-      }
-    };
+// 常见地址的坐标映射（长春市）
+const addressMap: Record<string, [number, number]> = {
+  '长春': [125.323544, 43.817071],
+  '长春市': [125.323544, 43.817071],
+  '长春工业大学': [125.2875, 43.8964],
+  '长春工业大学北湖西区': [125.2875, 43.8964],
+  '长春工业大学北湖校区': [125.2875, 43.8964],
+  '吉林大学': [125.2985, 43.8844],
+  '吉林大学前卫校区': [125.2985, 43.8844],
+  '宽城': [125.3200, 43.9000],
+  '宽城区': [125.3200, 43.9000],
+  '南关': [125.3300, 43.8600],
+  '南关区': [125.3300, 43.8600],
+  '朝阳': [125.3000, 43.8300],
+  '朝阳区': [125.3000, 43.8300],
+  '绿园': [125.2500, 43.8800],
+  '绿园区': [125.2500, 43.8800],
+  '二道': [125.3800, 43.8700],
+  '二道区': [125.3800, 43.8700],
+  '双阳': [125.6500, 43.5200],
+  '双阳区': [125.6500, 43.5200],
+  '净月': [125.4500, 43.8000],
+  '净月区': [125.4500, 43.8000],
+  '净月潭': [125.4500, 43.8000],
+  '长春站': [125.3235, 43.9065],
+  '长春火车站': [125.3235, 43.9065],
+  '长春西站': [125.2000, 43.8500],
+  '龙嘉机场': [125.7000, 44.0000],
+  '长春龙嘉国际机场': [125.7000, 44.0000],
+  '人民广场': [125.3200, 43.8900],
+  '文化广场': [125.3100, 43.8800],
+  '南湖公园': [125.3000, 43.8500],
+  '伪满皇宫': [125.3500, 43.9200],
+  '长影世纪城': [125.4500, 43.7800],
+  '欧亚卖场': [125.2500, 43.8600],
+  '红旗街': [125.2900, 43.8700],
+  '重庆路': [125.3200, 43.8900],
+  '桂林路': [125.3100, 43.8700],
+  '汽车厂': [125.2200, 43.8500],
+  '一汽': [125.2200, 43.8500],
+  '一汽大众': [125.2200, 43.8500],
+};
 
-    // 创建地图实例
-    const createMapInstance = () => {
-      const container = document.getElementById('monitorMapContainer');
-      if (!container) return;
+// 解析位置字符串为坐标
+const parseLocation = (location: string): [number, number] | null => {
+  if (!location) return null;
+  
+  // 1. 先检查地址映射
+  const trimmedLocation = location.trim();
+  if (addressMap[trimmedLocation]) {
+    console.log(`使用地址映射: ${trimmedLocation} -> [${addressMap[trimmedLocation][0]}, ${addressMap[trimmedLocation][1]}]`);
+    return addressMap[trimmedLocation];
+  }
+  
+  // 2. 尝试解析 "lat,lng" 格式
+  const match = location.match(/([\d.]+),\s*([\d.]+)/);
+  if (match) {
+    return [parseFloat(match[2]), parseFloat(match[1])]; // 注意：高德地图是 [lng, lat]
+  }
+  
+  return null;
+};
 
-      try {
-        mapInstance = new (window as any).AMap.Map('monitorMapContainer', {
-          zoom: DEFAULT_MAP_ZOOM,
-          center: DEFAULT_MAP_CENTER,
-        });
-        refreshMap();
-      } catch (error) {
-        console.error('地图初始化失败:', error);
-        ElMessage.warning('地图初始化失败，请检查高德地图API配置');
-      }
-    };
-
-    // 常见地址的坐标映射（长春市）
-    const addressMap: Record<string, [number, number]> = {
-      '长春': [125.323544, 43.817071],
-      '长春市': [125.323544, 43.817071],
-      '长春工业大学': [125.2875, 43.8964],
-      '长春工业大学北湖西区': [125.2875, 43.8964],
-      '长春工业大学北湖校区': [125.2875, 43.8964],
-      '吉林大学': [125.2985, 43.8844],
-      '吉林大学前卫校区': [125.2985, 43.8844],
-      '宽城': [125.3200, 43.9000],
-      '宽城区': [125.3200, 43.9000],
-      '南关': [125.3300, 43.8600],
-      '南关区': [125.3300, 43.8600],
-      '朝阳': [125.3000, 43.8300],
-      '朝阳区': [125.3000, 43.8300],
-      '绿园': [125.2500, 43.8800],
-      '绿园区': [125.2500, 43.8800],
-      '二道': [125.3800, 43.8700],
-      '二道区': [125.3800, 43.8700],
-      '双阳': [125.6500, 43.5200],
-      '双阳区': [125.6500, 43.5200],
-      '净月': [125.4500, 43.8000],
-      '净月区': [125.4500, 43.8000],
-      '净月潭': [125.4500, 43.8000],
-      '长春站': [125.3235, 43.9065],
-      '长春火车站': [125.3235, 43.9065],
-      '长春西站': [125.2000, 43.8500],
-      '龙嘉机场': [125.7000, 44.0000],
-      '长春龙嘉国际机场': [125.7000, 44.0000],
-      '人民广场': [125.3200, 43.8900],
-      '文化广场': [125.3100, 43.8800],
-      '南湖公园': [125.3000, 43.8500],
-      '伪满皇宫': [125.3500, 43.9200],
-      '长影世纪城': [125.4500, 43.7800],
-      '欧亚卖场': [125.2500, 43.8600],
-      '红旗街': [125.2900, 43.8700],
-      '重庆路': [125.3200, 43.8900],
-      '桂林路': [125.3100, 43.8700],
-      '汽车厂': [125.2200, 43.8500],
-      '一汽': [125.2200, 43.8500],
-      '一汽大众': [125.2200, 43.8500],
-    };
-
-    // 解析位置字符串为坐标
-    const parseLocation = (location: string): [number, number] | null => {
-      if (!location) return null;
-      
-      // 1. 先检查地址映射
-      const trimmedLocation = location.trim();
-      if (addressMap[trimmedLocation]) {
-        console.log(`使用地址映射: ${trimmedLocation} -> [${addressMap[trimmedLocation][0]}, ${addressMap[trimmedLocation][1]}]`);
-        return addressMap[trimmedLocation];
-      }
-      
-      // 2. 尝试解析 "lat,lng" 格式
-      const match = location.match(/([\d.]+),\s*([\d.]+)/);
-      if (match) {
-        return [parseFloat(match[2]), parseFloat(match[1])]; // 注意：高德地图是 [lng, lat]
-      }
-      
-      return null;
-    };
-
-    // 地理编码：将地址转换为坐标（使用高德地图Web服务API）
-    const geocodeAddress = (address: string): Promise<[number, number] | null> => {
-      return new Promise((resolve) => {
-        try {
-          if (!address) {
-            resolve(null);
-            return;
-          }
-
-          // 尝试解析坐标格式
-          const coords = parseLocation(address);
-          if (coords) {
-            resolve(coords);
-            return;
-          }
-
-          // 直接使用JS API进行地理编码（因为当前API密钥是JS API类型）
-          // 如果Web服务API密钥可用，可以改用Web服务API
-          if (typeof (window as any).AMap !== 'undefined') {
-            // 优先使用JS API
-            tryGeocodeWithJSAPI(address, resolve);
-          } else {
-            // 如果AMap未加载，尝试使用Web服务API（需要Web服务类型的密钥）
-            const apiKey = String(AMAP_API_KEY);
-            const encodedAddress = encodeURIComponent(address);
-            const url = `https://restapi.amap.com/v3/geocode/geo?key=${apiKey}&address=${encodedAddress}&city=长春市`;
-            
-            console.log(`AMap未加载，尝试使用Web API地理编码: ${address}`);
-            
-            const timeout = setTimeout(() => {
-              console.warn(`地理编码超时: ${address}`);
-              resolve(null);
-            }, 15000);
-
-            fetch(url)
-              .then(response => {
-                console.log(`Web API响应状态: ${response.status} for ${address}`);
-                if (!response.ok) {
-                  throw new Error(`HTTP ${response.status}`);
-                }
-                return response.json();
-              })
-              .then(data => {
-                clearTimeout(timeout);
-                console.log(`Web API返回数据:`, data);
-                if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
-                  const location = data.geocodes[0].location.split(',');
-                  const lng = parseFloat(location[0]);
-                  const lat = parseFloat(location[1]);
-                  console.log(`地理编码成功: ${address} -> [${lng}, ${lat}]`);
-                  resolve([lng, lat]);
-                } else {
-                  console.warn(`地理编码失败: ${address}`, data);
-                  resolve(null);
-                }
-              })
-              .catch(error => {
-                clearTimeout(timeout);
-                console.error(`地理编码请求失败: ${address}`, error);
-                resolve(null);
-              });
-          }
-        } catch (err) {
-          console.error(`地理编码处理异常: ${address}`, err);
-          resolve(null);
-        }
-      });
-    };
-
-    // 备用方案：使用JS API进行地理编码
-    const tryGeocodeWithJSAPI = (address: string, resolve: (value: [number, number] | null) => void) => {
-      console.log(`尝试使用JS API地理编码: ${address}`);
-      if (typeof (window as any).AMap === 'undefined') {
-        console.warn('AMap未加载，无法使用JS API');
+// 地理编码：将地址转换为坐标（使用高德地图Web服务API）
+const geocodeAddress = (address: string): Promise<[number, number] | null> => {
+  return new Promise((resolve) => {
+    try {
+      if (!address) {
         resolve(null);
         return;
       }
 
-      const AMap = (window as any).AMap;
-      let timeoutId: number | null = null;
-      let resolved = false;
-
-      const cleanup = () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-      };
-
-      const doResolve = (value: [number, number] | null) => {
-        if (!resolved) {
-          resolved = true;
-          cleanup();
-          resolve(value);
-        }
-      };
-
-      // 设置超时（20秒）
-      timeoutId = setTimeout(() => {
-        console.warn(`JS API地理编码超时: ${address}`);
-        doResolve(null);
-      }, 20000);
-
-      // 确保Geocoder插件已加载
-      const loadGeocoder = (callback: () => void) => {
-        if (AMap.Geocoder && typeof AMap.Geocoder === 'function') {
-          console.log('Geocoder已可用');
-          callback();
-        } else {
-          console.log('正在加载Geocoder插件...');
-          AMap.plugin('AMap.Geocoder', () => {
-            console.log('Geocoder插件加载完成');
-            if (AMap.Geocoder && typeof AMap.Geocoder === 'function') {
-              callback();
-            } else {
-              console.error('Geocoder插件加载失败');
-              doResolve(null);
-            }
-          });
-        }
-      };
-
-      loadGeocoder(() => {
-        try {
-          console.log(`使用Geocoder进行地理编码: ${address}`);
-          const geocoder = new AMap.Geocoder({
-            city: '长春市',
-          });
-          
-          console.log(`调用getLocation: ${address}`);
-          geocoder.getLocation(address, (status: string, result: any) => {
-            console.log(`Geocoder回调被触发 - 状态: ${status} for ${address}`, result);
-            if (status === 'complete' && result && result.geocodes && result.geocodes.length > 0) {
-              const location = result.geocodes[0].location;
-              if (location && typeof location.lng === 'number' && typeof location.lat === 'number') {
-                console.log(`地理编码成功(JS API): ${address} -> [${location.lng}, ${location.lat}]`);
-                doResolve([location.lng, location.lat]);
-              } else {
-                console.warn(`地理编码返回的坐标格式不正确:`, location);
-                doResolve(null);
-              }
-            } else {
-              console.warn(`地理编码失败(JS API): ${address}`, status, result);
-              doResolve(null);
-            }
-          });
-          
-          // 额外检查：如果5秒后还没有回调，记录警告
-          setTimeout(() => {
-            if (!resolved) {
-              console.warn(`警告: getLocation调用5秒后仍未收到回调 for ${address}`);
-            }
-          }, 5000);
-        } catch (err) {
-          console.error(`地理编码异常(JS API): ${address}`, err);
-          doResolve(null);
-        }
-      });
-    };
-
-    // 刷新地图上的车辆位置
-    const refreshMap = async () => {
-      if (!mapInstance) {
-        console.log('地图实例不存在，正在初始化...');
-        initMap();
-        // 等待地图初始化完成
-        setTimeout(() => {
-          if (mapInstance) {
-            refreshMap();
-          }
-        }, 1000);
+      // 尝试解析坐标格式
+      const coords = parseLocation(address);
+      if (coords) {
+        resolve(coords);
         return;
       }
 
-      // 清除现有标记
-      markers.forEach(marker => {
-        mapInstance.remove(marker);
+      // 直接使用JS API进行地理编码（因为当前API密钥是JS API类型）
+      // 如果Web服务API密钥可用，可以改用Web服务API
+      if (typeof (window as any).AMap !== 'undefined') {
+        // 优先使用JS API
+        tryGeocodeWithJSAPI(address, resolve);
+      } else {
+        // 如果AMap未加载，尝试使用Web服务API（需要Web服务类型的密钥）
+        const apiKey = String(AMAP_API_KEY);
+        const encodedAddress = encodeURIComponent(address);
+        const url = `https://restapi.amap.com/v3/geocode/geo?key=${apiKey}&address=${encodedAddress}&city=长春市`;
+        
+        console.log(`AMap未加载，尝试使用Web API地理编码: ${address}`);
+        
+        const timeout = setTimeout(() => {
+          console.warn(`地理编码超时: ${address}`);
+          resolve(null);
+        }, 15000);
+
+        fetch(url)
+          .then(response => {
+            console.log(`Web API响应状态: ${response.status} for ${address}`);
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+          })
+          .then(data => {
+            clearTimeout(timeout);
+            console.log(`Web API返回数据:`, data);
+            if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
+              const location = data.geocodes[0].location.split(',');
+              const lng = parseFloat(location[0]);
+              const lat = parseFloat(location[1]);
+              console.log(`地理编码成功: ${address} -> [${lng}, ${lat}]`);
+              resolve([lng, lat]);
+            } else {
+              console.warn(`地理编码失败: ${address}`, data);
+              resolve(null);
+            }
+          })
+          .catch(error => {
+            clearTimeout(timeout);
+            console.error(`地理编码请求失败: ${address}`, error);
+            resolve(null);
+          });
+      }
+    } catch (err) {
+      console.error(`地理编码处理异常: ${address}`, err);
+      resolve(null);
+    }
+  });
+};
+
+// 备用方案：使用JS API进行地理编码
+const tryGeocodeWithJSAPI = (address: string, resolve: (value: [number, number] | null) => void) => {
+  console.log(`尝试使用JS API地理编码: ${address}`);
+  if (typeof (window as any).AMap === 'undefined') {
+    console.warn('AMap未加载，无法使用JS API');
+    resolve(null);
+    return;
+  }
+
+  const AMap = (window as any).AMap;
+  let timeoutId: number | null = null;
+  let resolved = false;
+
+  const cleanup = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  const doResolve = (value: [number, number] | null) => {
+    if (!resolved) {
+      resolved = true;
+      cleanup();
+      resolve(value);
+    }
+  };
+
+  // 设置超时（20秒）
+  timeoutId = setTimeout(() => {
+    console.warn(`JS API地理编码超时: ${address}`);
+    doResolve(null);
+  }, 20000);
+
+  // 确保Geocoder插件已加载
+  const loadGeocoder = (callback: () => void) => {
+    if (AMap.Geocoder && typeof AMap.Geocoder === 'function') {
+      console.log('Geocoder已可用');
+      callback();
+    } else {
+      console.log('正在加载Geocoder插件...');
+      AMap.plugin('AMap.Geocoder', () => {
+        console.log('Geocoder插件加载完成');
+        if (AMap.Geocoder && typeof AMap.Geocoder === 'function') {
+          callback();
+        } else {
+          console.error('Geocoder插件加载失败');
+          doResolve(null);
+        }
       });
-      markers = [];
+    }
+  };
 
-      try {
-        // 检查车辆列表是否已加载
-        if (carList.value.length === 0) {
-          console.log('车辆列表为空，正在加载...');
-          await loadCars();
-        }
-
-        console.log('当前车辆列表:', carList.value.map(car => ({
-          carId: car.carId,
-          location: car.location,
-          status: car.status,
-          driverId: car.driverId,
-        })));
-
-        // 获取所有车辆的位置
-        const carsToShow = selectedCarId.value
-          ? carList.value.filter(car => car.carId === selectedCarId.value)
-          : carList.value;
-
-        console.log(`准备显示 ${carsToShow.length} 辆车辆`);
-
-        if (carsToShow.length === 0) {
-          ElMessage.info('当前没有可显示的车辆');
-          return;
-        }
-
-        // 检查有多少车辆有位置信息
-        const carsWithLocation = carsToShow.filter(car => car.location && car.location.trim() !== '');
-        console.log(`有位置信息的车辆: ${carsWithLocation.length}/${carsToShow.length}`);
-        if (carsWithLocation.length === 0) {
-          ElMessage.warning('当前车辆都没有位置信息，无法在地图上显示');
-          console.warn('所有车辆都没有位置信息:', carsToShow);
-          return;
-        }
-
-        // 统计信息
-        let successCount = 0;
-        let failCount = 0;
-        const failedCars: string[] = [];
-
-        // 使用 Promise.all 并行处理所有车辆的地理编码
-        const carPromises = carsToShow.map(async (car) => {
-          if (!car.location) {
-            failCount++;
-            failedCars.push(`车辆${car.carId}(无位置信息)`);
-            console.warn(`车辆 ${car.carId} 没有位置信息`);
-            return null;
-          }
-
-          console.log(`正在解析车辆 ${car.carId} 的位置: ${car.location}`);
-          const coords = await geocodeAddress(car.location);
-          if (!coords) {
-            failCount++;
-            failedCars.push(`车辆${car.carId}(${car.location})`);
-            console.warn(`车辆 ${car.carId} 的位置无法解析: ${car.location}`);
-            return null;
-          }
-
-          successCount++;
-          console.log(`车辆 ${car.carId} 位置解析成功: [${coords[0]}, ${coords[1]}]`);
-          return {
-            car,
-            coords,
-          };
-        });
-
-        const carLocations = await Promise.all(carPromises);
-
-        // 创建标记
-        for (const item of carLocations) {
-          if (!item) continue;
-
-          const { car, coords } = item;
-          try {
-            const marker = new (window as any).AMap.Marker({
-              position: coords,
-              title: `车辆${car.carId}${car.driverName ? ' - ' + car.driverName : ''}`,
-              label: {
-                content: `车辆${car.carId}`,
-                direction: 'right',
-              },
-            });
-
-            marker.setMap(mapInstance);
-            markers.push(marker);
-            console.log(`车辆 ${car.carId} 标记已添加到地图`);
-          } catch (err) {
-            console.error(`创建车辆 ${car.carId} 标记失败:`, err);
-            failCount++;
-            successCount--;
-          }
-        }
-
-        // 如果有标记，调整地图视野
-        if (markers.length > 0) {
-          mapInstance.setFitView(markers);
-          console.log(`成功显示 ${markers.length} 辆车辆的位置`);
-          if (failCount > 0) {
-            ElMessage.warning(`成功显示 ${successCount} 辆车辆，${failCount} 辆车辆位置解析失败`);
+  loadGeocoder(() => {
+    try {
+      console.log(`使用Geocoder进行地理编码: ${address}`);
+      const geocoder = new AMap.Geocoder({
+        city: '长春市',
+      });
+      
+      console.log(`调用getLocation: ${address}`);
+      geocoder.getLocation(address, (status: string, result: any) => {
+        console.log(`Geocoder回调被触发 - 状态: ${status} for ${address}`, result);
+        if (status === 'complete' && result && result.geocodes && result.geocodes.length > 0) {
+          const location = result.geocodes[0].location;
+          if (location && typeof location.lng === 'number' && typeof location.lat === 'number') {
+            console.log(`地理编码成功(JS API): ${address} -> [${location.lng}, ${location.lat}]`);
+            doResolve([location.lng, location.lat]);
           } else {
-            ElMessage.success(`成功显示 ${successCount} 辆车辆的位置`);
+            console.warn(`地理编码返回的坐标格式不正确:`, location);
+            doResolve(null);
           }
         } else {
-          ElMessage.warning('没有车辆位置可以显示在地图上。请检查车辆是否有位置信息，或位置格式是否正确');
-          console.warn('没有可显示的车辆位置', {
-            totalCars: carsToShow.length,
-            failedCars,
-          });
+          console.warn(`地理编码失败(JS API): ${address}`, status, result);
+          doResolve(null);
         }
-      } catch (error: any) {
-        console.error('刷新地图异常:', error);
-        ElMessage.error('刷新地图失败: ' + (error.message || '未知错误'));
+      });
+      
+      // 额外检查：如果5秒后还没有回调，记录警告
+      setTimeout(() => {
+        if (!resolved) {
+          console.warn(`警告: getLocation调用5秒后仍未收到回调 for ${address}`);
+        }
+      }, 5000);
+    } catch (err) {
+      console.error(`地理编码异常(JS API): ${address}`, err);
+      doResolve(null);
+    }
+  });
+};
+
+// 刷新地图上的车辆位置
+const refreshMap = async () => {
+  if (!mapInstance) {
+    console.log('地图实例不存在，正在初始化...');
+    initMap();
+    // 等待地图初始化完成
+    setTimeout(() => {
+      if (mapInstance) {
+        refreshMap();
       }
-    };
+    }, 1000);
+    return;
+  }
 
-    // 车辆选择变化
-    const onCarSelectChange = () => {
-      refreshMap();
-    };
+  // 清除现有标记
+  markers.forEach(marker => {
+    mapInstance.remove(marker);
+  });
+  markers = [];
 
-    // 显示全部车辆
-    const showAllCars = () => {
-      selectedCarId.value = null;
-      refreshMap();
-    };
+  try {
+    // 检查车辆列表是否已加载
+    if (carList.value.length === 0) {
+      console.log('车辆列表为空，正在加载...');
+      await loadCars();
+    }
 
-    const handleLogout = async () => {
+    console.log('当前车辆列表:', carList.value.map(car => ({
+      carId: car.carId,
+      location: car.location,
+      status: car.status,
+      driverId: car.driverId,
+    })));
+
+    // 获取所有车辆的位置
+    const carsToShow = selectedCarId.value
+      ? carList.value.filter(car => car.carId === selectedCarId.value)
+      : carList.value;
+
+    console.log(`准备显示 ${carsToShow.length} 辆车辆`);
+
+    if (carsToShow.length === 0) {
+      ElMessage.info('当前没有可显示的车辆');
+      return;
+    }
+
+    // 检查有多少车辆有位置信息
+    const carsWithLocation = carsToShow.filter(car => car.location && car.location.trim() !== '');
+    console.log(`有位置信息的车辆: ${carsWithLocation.length}/${carsToShow.length}`);
+    if (carsWithLocation.length === 0) {
+      ElMessage.warning('当前车辆都没有位置信息，无法在地图上显示');
+      console.warn('所有车辆都没有位置信息:', carsToShow);
+      return;
+    }
+
+    // 统计信息
+    let successCount = 0;
+    let failCount = 0;
+    const failedCars: string[] = [];
+
+    // 使用 Promise.all 并行处理所有车辆的地理编码
+    const carPromises = carsToShow.map(async (car) => {
+      if (!car.location) {
+        failCount++;
+        failedCars.push(`车辆${car.carId}(无位置信息)`);
+        console.warn(`车辆 ${car.carId} 没有位置信息`);
+        return null;
+      }
+
+      console.log(`正在解析车辆 ${car.carId} 的位置: ${car.location}`);
+      const coords = await geocodeAddress(car.location);
+      if (!coords) {
+        failCount++;
+        failedCars.push(`车辆${car.carId}(${car.location})`);
+        console.warn(`车辆 ${car.carId} 的位置无法解析: ${car.location}`);
+        return null;
+      }
+
+      successCount++;
+      console.log(`车辆 ${car.carId} 位置解析成功: [${coords[0]}, ${coords[1]}]`);
+      return {
+        car,
+        coords,
+      };
+    });
+
+    const carLocations = await Promise.all(carPromises);
+
+    // 创建标记
+    for (const item of carLocations) {
+      if (!item) continue;
+
+      const { car, coords } = item;
       try {
-        await dispatcherLogout();
-      } catch (error) {
-        // 忽略错误
-      } finally {
-        clearAuth();
-        ElMessage.success('已退出登录');
-        router.push('/login');
-      }
-    };
+        const marker = new (window as any).AMap.Marker({
+          position: coords,
+          title: `车辆${car.carId}${car.driverName ? ' - ' + car.driverName : ''}`,
+          label: {
+            content: `车辆${car.carId}`,
+            direction: 'right',
+          },
+        });
 
-    // 车辆类型文案映射：优先使用后端 type 枚举，其次兼容旧字段 carType
-    const getCarTypeText = (car: CarVO & { type?: number }) => {
-      const code = (car as any).type;
-      if (code === 0) return '微型';
-      if (code === 1) return '轻型';
-      if (code === 2) return '中型';
-      if (code === 3) return '重型';
-      if ((car as any).carType) {
-        return (car as any).carType;
+        marker.setMap(mapInstance);
+        markers.push(marker);
+        console.log(`车辆 ${car.carId} 标记已添加到地图`);
+      } catch (err) {
+        console.error(`创建车辆 ${car.carId} 标记失败:`, err);
+        failCount++;
+        successCount--;
       }
-      return '未知';
-    };
+    }
 
-    return {
-      activeTab,
-      loading,
-      carLoading,
-      waybillList,
-      carList,
-      availableCars,
-      waybillPage,
-      waybillPageSize,
-      waybillTotal,
-      carPage,
-      carPageSize,
-      carTotal,
-      userInfo,
-      waybillQuery,
-      carQuery,
-      assignDialogVisible,
-      assignForm,
-      carDialogVisible,
-      carDialogTitle,
-      carForm,
-      carRules,
-      carFormRef,
-      detailDialogVisible,
-      currentWaybill,
-      statistics,
-      handleTabChange,
-      loadWaybills,
-      loadCars,
-      loadStatistics,
-      viewWaybillDetail,
-      showAssignDialog,
-      confirmAssign,
-      autoAssign,
-      showCarDialog,
-      editCar,
-      saveCar,
-      deleteCar,
-      releaseCar,
-      getCarTypeText,
-      driverOptions,
-      driverLoading,
-      remoteSearchDrivers,
-      formatDriverOption,
-      handleLogout,
-      getStatusDesc,
-      getStatusType,
-      getCarStatusDesc,
-      getCarStatusType,
-      selectedCarId,
-      refreshMap,
-      onCarSelectChange,
-      showAllCars,
-      carLocationMapVisible,
-      carLocationName,
-      initCarLocationMap,
-      clearCarLocation,
-      reverseGeocodeCarLocation,
-      reverseGeocodeCarLocationInList,
-    };
-  },
-});
+    // 如果有标记，调整地图视野
+    if (markers.length > 0) {
+      mapInstance.setFitView(markers);
+      console.log(`成功显示 ${markers.length} 辆车辆的位置`);
+      if (failCount > 0) {
+        ElMessage.warning(`成功显示 ${successCount} 辆车辆，${failCount} 辆车辆位置解析失败`);
+      } else {
+        ElMessage.success(`成功显示 ${successCount} 辆车辆的位置`);
+      }
+    } else {
+      ElMessage.warning('没有车辆位置可以显示在地图上。请检查车辆是否有位置信息，或位置格式是否正确');
+      console.warn('没有可显示的车辆位置', {
+        totalCars: carsToShow.length,
+        failedCars,
+      });
+    }
+  } catch (error: any) {
+    console.error('刷新地图异常:', error);
+    ElMessage.error('刷新地图失败: ' + (error.message || '未知错误'));
+  }
+};
+
+// 车辆选择变化
+const onCarSelectChange = () => {
+  refreshMap();
+};
+
+// 显示全部车辆
+const showAllCars = () => {
+  selectedCarId.value = null;
+  refreshMap();
+};
+
+const handleLogout = async () => {
+  try {
+    await dispatcherLogout();
+  } catch (error) {
+    // 忽略错误
+  } finally {
+    clearAuth();
+    ElMessage.success('已退出登录');
+    router.push('/login');
+  }
+};
+
+// 车辆类型文案映射：优先使用后端 type 枚举，其次兼容旧字段 carType
+const getCarTypeText = (car: CarVO & { type?: number }) => {
+  const code = (car as any).type;
+  if (code === 0) return '微型';
+  if (code === 1) return '轻型';
+  if (code === 2) return '中型';
+  if (code === 3) return '重型';
+  if ((car as any).carType) {
+    return (car as any).carType;
+  }
+  return '未知';
+};
 </script>
 
 <style scoped>

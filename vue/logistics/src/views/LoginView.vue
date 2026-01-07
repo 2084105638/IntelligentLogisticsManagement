@@ -139,8 +139,8 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, reactive, ref } from 'vue';
+<script setup lang="ts">
+import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
@@ -150,173 +150,148 @@ import {
   driverLogin,
   driverRegister,
   adminLogin,
-  ConsignorRegisterDTO,
-  DriverRegisterDTO,
-  AdminLoginDTO,
+  type ConsignorRegisterDTO,
+  type DriverRegisterDTO,
 } from '../api';
 import { setToken, setUserInfo } from '../utils/auth';
 
-export default defineComponent({
-  name: 'LoginView',
-  setup() {
-    const router = useRouter();
-    const activeRole = ref('consignor');
-    const showRegister = ref(false);
-    const loading = ref(false);
-    const loginFormRef = ref();
-    const registerFormRef = ref();
+const router = useRouter();
+const activeRole = ref('consignor');
+const showRegister = ref(false);
+const loading = ref(false);
+const loginFormRef = ref();
+const registerFormRef = ref();
 
-    const loginForm = reactive({
-      phone: '',
-      password: '',
-      username: '', // 调度员、管理员使用
-    });
-
-    const registerForm = reactive({
-      email: '',
-      phone: '',
-      password: '',
-      name: '',
-      licenseNumber: '',
-    });
-
-    const loginRules = {
-      phone: [{ required: true, message: '请输入手机号或用户名', trigger: 'blur' }],
-      password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-      username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-    };
-
-    const registerRules = {
-      email: [
-        { required: true, message: '请输入邮箱', trigger: 'blur' },
-        { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' },
-      ],
-      phone: [
-        { required: true, message: '请输入手机号', trigger: 'blur' },
-        { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号', trigger: 'blur' },
-      ],
-      password: [
-        { required: true, message: '请输入密码', trigger: 'blur' },
-        { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
-      ],
-    };
-
-    const handleRoleChange = () => {
-      showRegister.value = false;
-      // 清空表单
-      Object.keys(loginForm).forEach((key) => {
-        (loginForm as any)[key] = '';
-      });
-      Object.keys(registerForm).forEach((key) => {
-        (registerForm as any)[key] = '';
-      });
-    };
-
-    const handleLogin = async () => {
-      if (!loginFormRef.value) return;
-      await loginFormRef.value.validate(async (valid: boolean) => {
-        if (valid) {
-          loading.value = true;
-          try {
-            let result: any;
-            if (activeRole.value === 'consignor') {
-              // 货主：后端使用 account 字段（可为手机号或邮箱）
-              result = await consignorLogin({
-                account: loginForm.phone,
-                password: loginForm.password,
-              });
-            } else if (activeRole.value === 'dispatcher') {
-              result = await dispatcherLogin({
-                username: loginForm.phone, // 调度员可能用手机号作为用户名
-                password: loginForm.password,
-              });
-            } else if (activeRole.value === 'driver') {
-              // 司机登录：后端字段为 account
-              result = await driverLogin({
-                account: loginForm.phone,
-                password: loginForm.password,
-              });
-            } else if (activeRole.value === 'admin') {
-              result = await adminLogin({
-                username: loginForm.phone, // 管理员使用用户名登录
-                password: loginForm.password,
-              });
-            }
-
-            if (result.data) {
-              setToken(result.data.token);
-              setUserInfo({ ...result.data, role: activeRole.value });
-              ElMessage.success('登录成功');
-              // 跳转到对应的工作台
-              if (activeRole.value === 'consignor') {
-                router.push('/owner');
-              } else if (activeRole.value === 'dispatcher') {
-                router.push('/dispatcher');
-              } else if (activeRole.value === 'driver') {
-                router.push('/driver');
-              } else if (activeRole.value === 'admin') {
-                router.push('/admin');
-              }
-            }
-          } catch (error: any) {
-            ElMessage.error(error.message || '登录失败');
-          } finally {
-            loading.value = false;
-          }
-        }
-      });
-    };
-
-    const handleRegister = async () => {
-      if (!registerFormRef.value) return;
-      await registerFormRef.value.validate(async (valid: boolean) => {
-        if (valid) {
-          loading.value = true;
-          try {
-            if (activeRole.value === 'consignor') {
-              const data: ConsignorRegisterDTO = {
-                email: registerForm.email,
-                phone: registerForm.phone,
-                password: registerForm.password,
-              };
-              await consignorRegister(data);
-              ElMessage.success('注册成功，请登录');
-              showRegister.value = false;
-            } else if (activeRole.value === 'driver') {
-              const data: DriverRegisterDTO = {
-                phone: registerForm.phone,
-                email: registerForm.email,
-                password: registerForm.password,
-              };
-              await driverRegister(data);
-              ElMessage.success('注册成功，请登录');
-              showRegister.value = false;
-            }
-          } catch (error: any) {
-            ElMessage.error(error.message || '注册失败');
-          } finally {
-            loading.value = false;
-          }
-        }
-      });
-    };
-
-    return {
-      activeRole,
-      showRegister,
-      loading,
-      loginForm,
-      registerForm,
-      loginRules,
-      registerRules,
-      loginFormRef,
-      registerFormRef,
-      handleRoleChange,
-      handleLogin,
-      handleRegister,
-    };
-  },
+const loginForm = reactive({
+  phone: '',
+  password: '',
+  username: '',
 });
+
+const registerForm = reactive({
+  email: '',
+  phone: '',
+  password: '',
+  name: '',
+  licenseNumber: '',
+});
+
+const loginRules = {
+  phone: [{ required: true, message: '请输入手机号或用户名', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+};
+
+const registerRules = {
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' },
+  ],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
+  ],
+};
+
+const handleRoleChange = () => {
+  showRegister.value = false;
+  Object.keys(loginForm).forEach((key) => {
+    (loginForm as any)[key] = '';
+  });
+  Object.keys(registerForm).forEach((key) => {
+    (registerForm as any)[key] = '';
+  });
+};
+
+const handleLogin = async () => {
+  if (!loginFormRef.value) return;
+  await loginFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      loading.value = true;
+      try {
+        let result: any;
+        if (activeRole.value === 'consignor') {
+          result = await consignorLogin({
+            account: loginForm.phone,
+            password: loginForm.password,
+          });
+        } else if (activeRole.value === 'dispatcher') {
+          result = await dispatcherLogin({
+            username: loginForm.phone,
+            password: loginForm.password,
+          });
+        } else if (activeRole.value === 'driver') {
+          result = await driverLogin({
+            account: loginForm.phone,
+            password: loginForm.password,
+          });
+        } else if (activeRole.value === 'admin') {
+          result = await adminLogin({
+            username: loginForm.phone,
+            password: loginForm.password,
+          });
+        }
+
+        if (result.data) {
+          setToken(result.data.token);
+          setUserInfo({ ...result.data, role: activeRole.value });
+          ElMessage.success('登录成功');
+          if (activeRole.value === 'consignor') {
+            router.push('/owner');
+          } else if (activeRole.value === 'dispatcher') {
+            router.push('/dispatcher');
+          } else if (activeRole.value === 'driver') {
+            router.push('/driver');
+          } else if (activeRole.value === 'admin') {
+            router.push('/admin');
+          }
+        }
+      } catch (error: any) {
+        ElMessage.error(error.message || '登录失败');
+      } finally {
+        loading.value = false;
+      }
+    }
+  });
+};
+
+const handleRegister = async () => {
+  if (!registerFormRef.value) return;
+  await registerFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      loading.value = true;
+      try {
+        if (activeRole.value === 'consignor') {
+          const data: ConsignorRegisterDTO = {
+            email: registerForm.email,
+            phone: registerForm.phone,
+            password: registerForm.password,
+          };
+          await consignorRegister(data);
+          ElMessage.success('注册成功，请登录');
+          showRegister.value = false;
+        } else if (activeRole.value === 'driver') {
+          const data: DriverRegisterDTO = {
+            phone: registerForm.phone,
+            email: registerForm.email,
+            password: registerForm.password,
+          };
+          await driverRegister(data);
+          ElMessage.success('注册成功，请登录');
+          showRegister.value = false;
+        }
+      } catch (error: any) {
+        ElMessage.error(error.message || '注册失败');
+      } finally {
+        loading.value = false;
+      }
+    }
+  });
+};
 </script>
 
 <style scoped>

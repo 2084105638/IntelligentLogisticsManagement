@@ -59,24 +59,14 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent } from 'vue';
+<script setup lang="ts">
 import { useRouter } from 'vue-router';
 
-export default defineComponent({
-  name: 'HomeView',
-  setup() {
-    const router = useRouter();
-    
-    const goToLogin = (role: string) => {
-      router.push('/login');
-    };
-    
-    return {
-      goToLogin,
-    };
-  },
-});
+const router = useRouter();
+
+const goToLogin = (role: string) => {
+  router.push('/login');
+};
 </script>
 
 <style scoped>

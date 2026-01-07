@@ -37,18 +37,18 @@
                   <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
                     <div style="display: flex; gap: 8px;">
                       <el-input
-                        v-model="waybillForm.startAddress"
+                        v-model="startAddressDisplay"
                         placeholder="请通过地图选择发货位置"
                         readonly
                       />
                       <el-button type="primary" plain @click="openLocationPicker('start')">地图选择</el-button>
                     </div>
-                    <div v-if="startPickedLocationText || startPickedAddressText" style="font-size: 12px; color: #909399;">
-                      <div v-if="startPickedLocationText">
-                        经纬度：{{ startPickedLocationText }}
+                    <div v-if="startPickedLocationText" style="font-size: 12px; color: #909399;">
+                      <div v-if="startPickedAddressText">
+                        已选择：{{ startPickedAddressText }}
                       </div>
-                      <div v-if="startPickedAddressText" style="color: #67c23a;">
-                        解析地址：{{ startPickedAddressText }}
+                      <div>
+                        经纬度：{{ startPickedLocationText }}
                       </div>
                     </div>
                   </div>
@@ -57,18 +57,18 @@
                   <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
                     <div style="display: flex; gap: 8px;">
                       <el-input
-                        v-model="waybillForm.endAddress"
+                        v-model="endAddressDisplay"
                         placeholder="请通过地图选择收货位置"
                         readonly
                       />
                       <el-button type="primary" plain @click="openLocationPicker('end')">地图选择</el-button>
                     </div>
-                    <div v-if="endPickedLocationText || endPickedAddressText" style="font-size: 12px; color: #909399;">
-                      <div v-if="endPickedLocationText">
-                        经纬度：{{ endPickedLocationText }}
+                    <div v-if="endPickedLocationText" style="font-size: 12px; color: #909399;">
+                      <div v-if="endPickedAddressText">
+                        已选择：{{ endPickedAddressText }}
                       </div>
-                      <div v-if="endPickedAddressText" style="color: #67c23a;">
-                        解析地址：{{ endPickedAddressText }}
+                      <div>
+                        经纬度：{{ endPickedLocationText }}
                       </div>
                     </div>
                   </div>
@@ -93,9 +93,9 @@
                   />
                 </el-form-item>
                 <el-form-item label="收货人ID" prop="receivingConsignorId">
-                  <el-input-number
+                  <el-input
                     v-model="waybillForm.receivingConsignorId"
-                    :min="1"
+                    type="text"
                     placeholder="请输入收货人ID"
                     style="width: 100%"
                   />
@@ -206,26 +206,26 @@
                   <el-input v-model="profileForm.email" placeholder="请输入邮箱地址" />
                 </el-form-item>
                 <el-form-item label="原密码" prop="oldPassword">
-                  <el-input 
-                    v-model="profileForm.oldPassword" 
-                    type="password" 
+                  <el-input
+                    v-model="profileForm.oldPassword"
+                    type="password"
                     placeholder="修改密码时请输入原密码"
                     show-password
                   />
                   <div style="font-size: 12px; color: #909399; margin-top: 5px;">不修改密码可留空</div>
                 </el-form-item>
                 <el-form-item label="新密码" prop="newPassword">
-                  <el-input 
-                    v-model="profileForm.newPassword" 
-                    type="password" 
+                  <el-input
+                    v-model="profileForm.newPassword"
+                    type="password"
                     placeholder="请输入新密码"
                     show-password
                   />
                 </el-form-item>
                 <el-form-item label="确认密码" prop="confirmPassword">
-                  <el-input 
-                    v-model="profileForm.confirmPassword" 
-                    type="password" 
+                  <el-input
+                    v-model="profileForm.confirmPassword"
+                    type="password"
                     placeholder="请再次输入新密码"
                     show-password
                   />
@@ -280,8 +280,8 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, reactive, ref, onMounted, computed } from 'vue';
+<script setup lang="ts">
+import { reactive, ref, onMounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
@@ -291,920 +291,768 @@ import {
   cancelWaybill as cancelWaybillAPI,
   getConsignorInfo,
   changeConsignorInfo,
-  ConsignorChangeInfoDTO,
-  WaybillCreateDTO,
-  WaybillVO,
+  type ConsignorChangeInfoDTO,
+  type WaybillCreateDTO,
+  type WaybillVO,
 } from '../api';
 import { clearAuth, getUserInfo } from '../utils/auth';
 import { getStatusDesc, getStatusType } from '../utils/waybillStatus';
 import { AMAP_API_KEY, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from '../config/map';
 
-export default defineComponent({
-  name: 'OwnerDashboard',
-  setup() {
-    const router = useRouter();
-    const activeTab = ref('create');
-    const loading = ref(false);
-    const creating = ref(false);
-    const waybillFormRef = ref();
-    const waybillList = ref<WaybillVO[]>([]);
-    const currentPage = ref(1);
-    const pageSize = ref(10);
-    const total = ref(0);
-    const queryStatus = ref<number | undefined>(undefined);
-    const detailDialogVisible = ref(false);
-    const currentWaybill = ref<WaybillVO | null>(null);
-    const userInfo = ref<any>(null);
-    const profileFormRef = ref();
-    const updating = ref(false);
-    const profileForm = reactive({
-      phone: '',
-      email: '',
-      oldPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    });
+const router = useRouter();
+const activeTab = ref('create');
+const loading = ref(false);
+const creating = ref(false);
+const waybillFormRef = ref();
+const waybillList = ref<WaybillVO[]>([]);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
+const queryStatus = ref<number | undefined>(undefined);
+const detailDialogVisible = ref(false);
+const currentWaybill = ref<WaybillVO | null>(null);
+const userInfo = ref<any>(null);
+const profileFormRef = ref();
+const updating = ref(false);
 
-    // 个人信息表单验证规则
-    const profileRules = {
-      email: [
-        { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' },
-      ],
-      oldPassword: [
-        {
-          validator: (rule: any, value: string, callback: (error?: Error) => void) => {
-            // 如果填写了新密码，原密码必填
-            if (profileForm.newPassword && !value) {
-              callback(new Error('修改密码时请输入原密码'));
-            } else {
-              callback();
-            }
-          },
-          trigger: 'blur',
-        },
-      ],
-      newPassword: [
-        {
-          validator: (rule: any, value: string, callback: (error?: Error) => void) => {
-            if (value) {
-              if (value.length < 6) {
-                callback(new Error('密码长度不能少于6位'));
-              } else if (value.length > 20) {
-                callback(new Error('密码长度不能超过20位'));
-              } else {
-                callback();
-              }
-            } else {
-              callback();
-            }
-          },
-          trigger: 'blur',
-        },
-      ],
-      confirmPassword: [
-        {
-          validator: (rule: any, value: string, callback: (error?: Error) => void) => {
-            if (profileForm.newPassword) {
-              if (!value) {
-                callback(new Error('请再次输入新密码'));
-              } else if (value !== profileForm.newPassword) {
-                callback(new Error('两次输入的密码不一致'));
-              } else {
-                callback();
-              }
-            } else {
-              callback();
-            }
-          },
-          trigger: 'blur',
-        },
-      ],
-    };
+const profileForm = reactive({
+  phone: '',
+  email: '',
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+});
 
-    const waybillForm = reactive<WaybillCreateDTO & { receivingConsignorId: number }>({
-      receivingConsignorId: 0,
-      goodsInformation: '',
-      startAddress: '',
-      endAddress: '',
-      expectedTimeLimit: '',
-      cost: 0,
-    });
-
-    // 地址选择地图相关（发货/收货地址）
-    const locationPickerVisible = ref(false);
-    const locationPickerTitle = ref('选择地址');
-    const locationPickerTarget = ref<'start' | 'end'>('start');
-    let addressMapInstance: any = null;
-    let addressMarker: any = null;
-    const pickedLat = ref<number | null>(null);
-    const pickedLng = ref<number | null>(null);
-    const pickedLocationText = computed(() => {
-      if (pickedLat.value == null || pickedLng.value == null) return '';
-      return `${pickedLat.value.toFixed(6)},${pickedLng.value.toFixed(6)}`;
-    });
-    const pickedAddressText = ref('');
-    const startPickedLocationText = ref('');
-    const startPickedAddressText = ref('');
-    const endPickedLocationText = ref('');
-    const endPickedAddressText = ref('');
-
-    const waybillRules = {
-      goodsInformation: [{ required: true, message: '请输入货物信息', trigger: 'blur' }],
-      startAddress: [{ required: true, message: '请输入发货地址', trigger: 'blur' }],
-      endAddress: [{ required: true, message: '请输入收货地址', trigger: 'blur' }],
-      expectedTimeLimit: [{ required: true, message: '请选择期望时效', trigger: 'change' }],
-      cost: [{ required: true, message: '请输入费用', trigger: 'blur' }],
-      receivingConsignorId: [{ required: true, message: '请输入收货人ID', trigger: 'blur' }],
-    };
-
-    // 地图相关
-    const selectedWaybillId = ref<string | null>(null);
-    let ownerMapInstance: any = null;
-    let ownerMarkers: any[] = [];
-
-    onMounted(() => {
-      loadUserInfo();
-      if (activeTab.value === 'track') {
-        loadWaybills();
-      }
-      // 延迟加载地图
-      setTimeout(() => {
-        initOwnerMap();
-      }, 500);
-    });
-
-    const loadUserInfo = async () => {
-      try {
-        const info = getUserInfo();
-        userInfo.value = info;
-        const result = await getConsignorInfo();
-        if (result.data) {
-          const userData = result.data as any;
-          profileForm.phone = userData.phone || '';
-          profileForm.email = userData.email || '';
-        }
-      } catch (error) {
-        console.error('加载用户信息失败:', error);
-      }
-    };
-
-    const handleTabChange = (tab: string) => {
-      if (tab === 'track') {
-        loadWaybills();
-      } else if (tab === 'realtime') {
-        // 切换到地图标签页时，确保运单数据已加载，然后初始化地图并加载运单位置
-        if (waybillList.value.length === 0) {
-          loadWaybills().then(() => {
-            setTimeout(() => {
-              if (!ownerMapInstance) {
-                initOwnerMap();
-              } else {
-                refreshOwnerMap();
-              }
-            }, 300);
-          });
+// 个人信息表单验证规则
+const profileRules = {
+  email: [
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' },
+  ],
+  oldPassword: [
+    {
+      validator: (rule: any, value: string, callback: (error?: Error) => void) => {
+        if (profileForm.newPassword && !value) {
+          callback(new Error('修改密码时请输入原密码'));
         } else {
-          setTimeout(() => {
-            if (!ownerMapInstance) {
-              initOwnerMap();
-            } else {
-              refreshOwnerMap();
-            }
-          }, 100);
+          callback();
         }
-      }
-    };
+      },
+      trigger: 'blur',
+    },
+  ],
+  newPassword: [
+    {
+      validator: (rule: any, value: string, callback: (error?: Error) => void) => {
+        if (value) {
+          if (value.length < 6) {
+            callback(new Error('密码长度不能少于6位'));
+          } else if (value.length > 20) {
+            callback(new Error('密码长度不能超过20位'));
+          } else {
+            callback();
+          }
+        } else {
+          callback();
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+  confirmPassword: [
+    {
+      validator: (rule: any, value: string, callback: (error?: Error) => void) => {
+        if (profileForm.newPassword) {
+          if (!value) {
+            callback(new Error('请再次输入新密码'));
+          } else if (value !== profileForm.newPassword) {
+            callback(new Error('两次输入的密码不一致'));
+          } else {
+            callback();
+          }
+        } else {
+          callback();
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+};
 
-    // 打开地址选择地图对话框
-    const openLocationPicker = (target: 'start' | 'end') => {
-      locationPickerTarget.value = target;
-      locationPickerTitle.value = target === 'start' ? '选择发货地址' : '选择收货地址';
-      pickedLat.value = null;
-      pickedLng.value = null;
-      pickedAddressText.value = '';
-      locationPickerVisible.value = true;
+const waybillForm = reactive<WaybillCreateDTO>({
+  receivingConsignorId: '',
+  goodsInformation: '',
+  startAddress: '', // 存储经纬度 (格式: 纬度,经度)
+  endAddress: '', // 存储经纬度 (格式: 纬度,经度)
+  expectedTimeLimit: '',
+  cost: 0,
+});
 
-      // 等待对话框渲染完成再初始化地图
+// 用于显示的地址名称（不发送给后端）
+const startAddressDisplay = ref('');
+const endAddressDisplay = ref('');
+
+// 地址选择地图相关（发货/收货地址）
+const locationPickerVisible = ref(false);
+const locationPickerTitle = ref('选择地址');
+const locationPickerTarget = ref<'start' | 'end'>('start');
+let addressMapInstance: any = null;
+let addressMarker: any = null;
+const pickedLat = ref<number | null>(null);
+const pickedLng = ref<number | null>(null);
+const pickedLocationText = computed(() => {
+  if (pickedLat.value == null || pickedLng.value == null) return '';
+  return `${pickedLat.value.toFixed(6)},${pickedLng.value.toFixed(6)}`;
+});
+const pickedAddressText = ref('');
+const startPickedLocationText = ref('');
+const startPickedAddressText = ref('');
+const endPickedLocationText = ref('');
+const endPickedAddressText = ref('');
+
+const waybillRules = {
+  goodsInformation: [{ required: true, message: '请输入货物信息', trigger: 'blur' }],
+  startAddress: [{ required: true, message: '请输入发货地址', trigger: 'blur' }],
+  endAddress: [{ required: true, message: '请输入收货地址', trigger: 'blur' }],
+  expectedTimeLimit: [{ required: true, message: '请选择期望时效', trigger: 'change' }],
+  cost: [{ required: true, message: '请输入费用', trigger: 'blur' }],
+  receivingConsignorId: [{ required: true, message: '请输入收货人ID', trigger: 'blur' }],
+};
+
+// 地图相关
+const selectedWaybillId = ref<string | null>(null);
+let ownerMapInstance: any = null;
+let ownerMarkers: any[] = [];
+
+onMounted(() => {
+  loadUserInfo();
+  if (activeTab.value === 'track') {
+    loadWaybills();
+  }
+  setTimeout(() => {
+    initOwnerMap();
+  }, 500);
+});
+
+const loadUserInfo = async () => {
+  try {
+    const info = getUserInfo();
+    userInfo.value = info;
+    const result = await getConsignorInfo();
+    if (result.data) {
+      const userData = result.data as any;
+      profileForm.phone = userData.phone || '';
+      profileForm.email = userData.email || '';
+    }
+  } catch (error) {
+    console.error('加载用户信息失败:', error);
+  }
+};
+
+const handleTabChange = (tab: string) => {
+  if (tab === 'track') {
+    loadWaybills();
+  } else if (tab === 'realtime') {
+    if (waybillList.value.length === 0) {
+      loadWaybills().then(() => {
+        setTimeout(() => {
+          if (!ownerMapInstance) {
+            initOwnerMap();
+          } else {
+            refreshOwnerMap();
+          }
+        }, 300);
+      });
+    } else {
       setTimeout(() => {
-        initAddressMap();
-      }, 300);
+        if (!ownerMapInstance) {
+          initOwnerMap();
+        } else {
+          refreshOwnerMap();
+        }
+      }, 100);
+    }
+  }
+};
+
+// 打开地址选择地图对话框
+const openLocationPicker = (target: 'start' | 'end') => {
+  locationPickerTarget.value = target;
+  locationPickerTitle.value = target === 'start' ? '选择发货地址' : '选择收货地址';
+  pickedLat.value = null;
+  pickedLng.value = null;
+  pickedAddressText.value = '';
+  locationPickerVisible.value = true;
+
+  setTimeout(() => {
+    initAddressMap();
+  }, 300);
+};
+
+const initAddressMap = () => {
+  const container = document.getElementById('addressMapContainer');
+  if (!container) {
+    console.warn('地址选择地图容器不存在');
+    return;
+  }
+
+  const apiKey = String(AMAP_API_KEY);
+  if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
+    ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
+    return;
+  }
+
+  if (typeof (window as any).AMap === 'undefined') {
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&callback=initOwnerAddressAMap`;
+    script.async = true;
+    (window as any).initOwnerAddressAMap = () => {
+      createAddressMapInstance();
+    };
+    document.head.appendChild(script);
+  } else {
+    createAddressMapInstance();
+  }
+};
+
+const createAddressMapInstance = () => {
+  const container = document.getElementById('addressMapContainer');
+  if (!container) return;
+
+  try {
+    if (addressMapInstance) {
+      addressMapInstance.destroy();
+      addressMapInstance = null;
+      addressMarker = null;
+    }
+
+    addressMapInstance = new (window as any).AMap.Map('addressMapContainer', {
+      zoom: 12,
+      center: DEFAULT_MAP_CENTER,
+    });
+
+    addressMapInstance.on('click', (e: any) => {
+      const lng = e.lnglat.getLng();
+      const lat = e.lnglat.getLat();
+      pickedLat.value = lat;
+      pickedLng.value = lng;
+
+      if (addressMarker) {
+        addressMapInstance.remove(addressMarker);
+      }
+      addressMarker = new (window as any).AMap.Marker({
+        position: [lng, lat],
+        draggable: true,
+      });
+      addressMarker.setMap(addressMapInstance);
+
+      addressMarker.on('dragend', () => {
+        const pos = addressMarker.getPosition();
+        pickedLat.value = pos.getLat();
+        pickedLng.value = pos.getLng();
+        reverseGeocodeAndUpdateDisplay(pickedLat.value, pickedLng.value);
+      });
+
+      reverseGeocodeAndUpdateDisplay(lat, lng);
+    });
+  } catch (error) {
+    console.error('地址选择地图初始化失败:', error);
+    ElMessage.warning('地址选择地图初始化失败，请检查高德地图API配置');
+  }
+};
+
+// 调用高德逆地理编码，将经纬度解析为具体地址并实时更新显示
+const reverseGeocodeAndUpdateDisplay = async (lat: number | null, lng: number | null) => {
+  if (lat == null || lng == null) return;
+  try {
+    const apiKey = String(AMAP_API_KEY);
+    const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.status === '1' && data.regeocode && data.regeocode.formatted_address) {
+      const addressName = data.regeocode.formatted_address;
+      pickedAddressText.value = addressName;
+
+      await nextTick();
+
+      if (locationPickerTarget.value === 'start') {
+        startAddressDisplay.value = addressName;
+      } else {
+        endAddressDisplay.value = addressName;
+      }
+    } else {
+      pickedAddressText.value = '';
+    }
+  } catch (err) {
+    console.error('地址反向地理编码失败:', err);
+    pickedAddressText.value = '';
+  }
+};
+
+const confirmLocationPick = () => {
+  if (pickedLat.value == null || pickedLng.value == null) {
+    ElMessage.warning('请先在地图上点击选择一个位置');
+    return;
+  }
+  const coordText = `${pickedLat.value},${pickedLng.value}`;
+
+  if (locationPickerTarget.value === 'start') {
+    waybillForm.startAddress = coordText;
+    startPickedLocationText.value = coordText;
+    startPickedAddressText.value = pickedAddressText.value;
+  } else {
+    waybillForm.endAddress = coordText;
+    endPickedLocationText.value = coordText;
+    endPickedAddressText.value = pickedAddressText.value;
+  }
+  locationPickerVisible.value = false;
+};
+
+const handleCreateWaybill = async () => {
+  if (!waybillFormRef.value) return;
+  await waybillFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      creating.value = true;
+      try {
+        await createWaybill(waybillForm);
+        ElMessage.success('运单创建成功');
+        resetForm();
+        activeTab.value = 'track';
+        loadWaybills();
+      } catch (error: any) {
+        ElMessage.error(error.message || '创建运单失败');
+      } finally {
+        creating.value = false;
+      }
+    }
+  });
+};
+
+const resetForm = () => {
+  waybillForm.receivingConsignorId = '';
+  waybillForm.goodsInformation = '';
+  waybillForm.startAddress = '';
+  waybillForm.endAddress = '';
+  waybillForm.expectedTimeLimit = '';
+  waybillForm.cost = 0;
+  startAddressDisplay.value = '';
+  endAddressDisplay.value = '';
+  startPickedLocationText.value = '';
+  endPickedLocationText.value = '';
+  startPickedAddressText.value = '';
+  endPickedAddressText.value = '';
+  waybillFormRef.value?.resetFields();
+};
+
+const loadWaybills = async () => {
+  loading.value = true;
+  try {
+    const result = await queryWaybillsByStatus(queryStatus.value, currentPage.value, pageSize.value);
+    if (result.data) {
+      const pageData = result.data as any;
+      const records: any[] = pageData.records || [];
+      const filtered = records.filter((w) => w.changed === 0 || w.changed === undefined);
+      const dedupMap = new Map<string, any>();
+      filtered.forEach((w) => {
+        const key = [
+          w.goodsInformation,
+          w.startAddress,
+          w.endAddress,
+          w.expectedTimeLimit,
+          w.cost,
+        ].join('|');
+        const prev = dedupMap.get(key);
+        if (!prev) {
+          dedupMap.set(key, w);
+          return;
+        }
+        const statusPriority = (s: number) => {
+          if (s === 1 || s === 2 || s === 3) return 2;
+          return 1;
+        };
+        const prevPri = statusPriority(prev.status);
+        const curPri = statusPriority(w.status);
+        if (curPri > prevPri) {
+          dedupMap.set(key, w);
+          return;
+        }
+        if (curPri === prevPri) {
+          const prevTime = new Date(prev.createTime).getTime();
+          const curTime = new Date(w.createTime).getTime();
+          if (curTime >= prevTime) {
+            dedupMap.set(key, w);
+          }
+        }
+      });
+      waybillList.value = Array.from(dedupMap.values());
+      total.value = waybillList.value.length;
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载运单列表失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const viewWaybillDetail = async (row: WaybillVO) => {
+  try {
+    const result = await getWaybillDetail(row.waybillId);
+    if (result.data) {
+      currentWaybill.value = result.data as unknown as WaybillVO;
+      detailDialogVisible.value = true;
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取运单详情失败');
+  }
+};
+
+const cancelWaybill = async (waybillId: string) => {
+  try {
+    await ElMessageBox.confirm('确定要取消该运单吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    });
+    await cancelWaybillAPI(waybillId);
+    ElMessage.success('运单已取消');
+    loadWaybills();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '取消运单失败');
+    }
+  }
+};
+
+const confirmReceive = async (row: WaybillVO) => {
+  try {
+    await ElMessageBox.confirm('确认已收到货物？', '确认签收', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'success',
+    });
+    ElMessage.success('签收成功');
+    loadWaybills();
+  } catch (error) {
+    // 用户取消
+  }
+};
+
+const resetProfileForm = () => {
+  profileFormRef.value?.resetFields();
+  loadUserInfo();
+};
+
+const updateProfile = async () => {
+  if (!profileFormRef.value) return;
+
+  try {
+    await profileFormRef.value.validate();
+
+    updating.value = true;
+
+    const updateData: ConsignorChangeInfoDTO = {
+      email: profileForm.email,
     };
 
-    const initAddressMap = () => {
-      const container = document.getElementById('addressMapContainer');
-      if (!container) {
-        console.warn('地址选择地图容器不存在');
+    if (profileForm.newPassword) {
+      updateData.oldPassword = profileForm.oldPassword;
+      updateData.newPassword = profileForm.newPassword;
+    }
+
+    await changeConsignorInfo(updateData);
+
+    ElMessage.success('个人信息更新成功');
+
+    profileForm.oldPassword = '';
+    profileForm.newPassword = '';
+    profileForm.confirmPassword = '';
+
+    await loadUserInfo();
+  } catch (error: any) {
+    if (error.message) {
+      ElMessage.error(error.message);
+    } else {
+      ElMessage.error('更新失败，请稍后重试');
+    }
+  } finally {
+    updating.value = false;
+  }
+};
+
+// 初始化地图
+const initOwnerMap = () => {
+  const container = document.getElementById('mapContainer');
+  if (!container) {
+    console.warn('地图容器不存在');
+    return;
+  }
+
+  if (typeof (window as any).AMap === 'undefined') {
+    const apiKey = String(AMAP_API_KEY);
+    if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
+      ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
+      return;
+    }
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geocoder&callback=initOwnerAMap`;
+    script.async = true;
+    (window as any).initOwnerAMap = () => {
+      createOwnerMapInstance();
+    };
+    document.head.appendChild(script);
+  } else {
+    createOwnerMapInstance();
+  }
+};
+
+// 创建地图实例
+const createOwnerMapInstance = () => {
+  const container = document.getElementById('mapContainer');
+  if (!container) return;
+
+  try {
+    ownerMapInstance = new (window as any).AMap.Map('mapContainer', {
+      zoom: DEFAULT_MAP_ZOOM,
+      center: DEFAULT_MAP_CENTER,
+    });
+    refreshOwnerMap();
+  } catch (error) {
+    console.error('地图初始化失败:', error);
+    ElMessage.warning('地图初始化失败，请检查高德地图API配置');
+  }
+};
+
+// 常见地址的坐标映射（长春市）
+const addressMap: Record<string, [number, number]> = {
+  '长春': [125.323544, 43.817071],
+  '长春市': [125.323544, 43.817071],
+  '长春工业大学': [125.2875, 43.8964],
+  '长春工业大学北湖西区': [125.2875, 43.8964],
+  '长春工业大学北湖校区': [125.2875, 43.8964],
+  '吉林大学': [125.2985, 43.8844],
+  '吉林大学前卫校区': [125.2985, 43.8844],
+  '宽城': [125.3200, 43.9000],
+  '宽城区': [125.3200, 43.9000],
+  '南关': [125.3300, 43.8600],
+  '南关区': [125.3300, 43.8600],
+  '朝阳': [125.3000, 43.8300],
+  '朝阳区': [125.3000, 43.8300],
+  '绿园': [125.2500, 43.8800],
+  '绿园区': [125.2500, 43.8800],
+  '二道': [125.3800, 43.8700],
+  '二道区': [125.3800, 43.8700],
+  '双阳': [125.6500, 43.5200],
+  '双阳区': [125.6500, 43.5200],
+  '净月': [125.4500, 43.8000],
+  '净月区': [125.4500, 43.8000],
+  '净月潭': [125.4500, 43.8000],
+  '长春站': [125.3235, 43.9065],
+  '长春火车站': [125.3235, 43.9065],
+  '长春西站': [125.2000, 43.8500],
+  '龙嘉机场': [125.7000, 44.0000],
+  '长春龙嘉国际机场': [125.7000, 44.0000],
+  '人民广场': [125.3200, 43.8900],
+  '文化广场': [125.3100, 43.8800],
+  '南湖公园': [125.3000, 43.8500],
+  '伪满皇宫': [125.3500, 43.9200],
+  '长影世纪城': [125.4500, 43.7800],
+  '欧亚卖场': [125.2500, 43.8600],
+  '红旗街': [125.2900, 43.8700],
+  '重庆路': [125.3200, 43.8900],
+  '桂林路': [125.3100, 43.8700],
+  '汽车厂': [125.2200, 43.8500],
+  '一汽': [125.2200, 43.8500],
+  '一汽大众': [125.2200, 43.8500],
+};
+
+// 地理编码：将地址转换为坐标
+const geocodeAddress = (address: string): Promise<[number, number] | null> => {
+  return new Promise((resolve) => {
+    try {
+      if (!address) {
+        resolve(null);
+        return;
+      }
+
+      const trimmedAddress = address.trim();
+      if (addressMap[trimmedAddress]) {
+        resolve(addressMap[trimmedAddress]);
+        return;
+      }
+
+      const coordMatch = address.match(/([\d.]+),\s*([\d.]+)/);
+      if (coordMatch) {
+        resolve([parseFloat(coordMatch[2]), parseFloat(coordMatch[1])]);
         return;
       }
 
       const apiKey = String(AMAP_API_KEY);
-      if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
-        ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
-        return;
-      }
+      const encodedAddress = encodeURIComponent(address);
+      const url = `https://restapi.amap.com/v3/geocode/geo?key=${apiKey}&address=${encodedAddress}&city=长春市`;
 
-      if (typeof (window as any).AMap === 'undefined') {
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&callback=initOwnerAddressAMap`;
-        script.async = true;
-        (window as any).initOwnerAddressAMap = () => {
-          createAddressMapInstance();
-        };
-        document.head.appendChild(script);
-      } else {
-        createAddressMapInstance();
-      }
-    };
-
-    const createAddressMapInstance = () => {
-      const container = document.getElementById('addressMapContainer');
-      if (!container) return;
-
-      try {
-        // 如果已有实例，先销毁
-        if (addressMapInstance) {
-          addressMapInstance.destroy();
-          addressMapInstance = null;
-          addressMarker = null;
-        }
-
-        addressMapInstance = new (window as any).AMap.Map('addressMapContainer', {
-          zoom: 12,
-          center: DEFAULT_MAP_CENTER,
-        });
-
-        // 点击地图选择位置
-        addressMapInstance.on('click', (e: any) => {
-          const lng = e.lnglat.getLng();
-          const lat = e.lnglat.getLat();
-          pickedLat.value = lat;
-          pickedLng.value = lng;
-
-          // 清除旧标记
-          if (addressMarker) {
-            addressMapInstance.remove(addressMarker);
-          }
-          addressMarker = new (window as any).AMap.Marker({
-            position: [lng, lat],
-            draggable: true,
-          });
-          addressMarker.setMap(addressMapInstance);
-
-          // 拖动更新坐标
-          addressMarker.on('dragend', () => {
-            const pos = addressMarker.getPosition();
-            pickedLat.value = pos.getLat();
-            pickedLng.value = pos.getLng();
-            reverseGeocodeLatLng(pickedLat.value, pickedLng.value);
-          });
-
-          // 选点后立即反向地理编码得到人类可读地址
-          reverseGeocodeLatLng(lat, lng);
-        });
-      } catch (error) {
-        console.error('地址选择地图初始化失败:', error);
-        ElMessage.warning('地址选择地图初始化失败，请检查高德地图API配置');
-      }
-    };
-
-    // 调用高德逆地理编码，将经纬度解析为具体地址
-    const reverseGeocodeLatLng = async (lat: number | null, lng: number | null) => {
-      if (lat == null || lng == null) return;
-      try {
-        const apiKey = String(AMAP_API_KEY);
-        const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
-        const resp = await fetch(url);
-        const data = await resp.json();
-        if (data.status === '1' && data.regeocode && data.regeocode.formatted_address) {
-          pickedAddressText.value = data.regeocode.formatted_address;
-        } else {
-          pickedAddressText.value = '';
-        }
-      } catch (err) {
-        console.error('地址反向地理编码失败:', err);
-        pickedAddressText.value = '';
-      }
-    };
-
-    const confirmLocationPick = () => {
-      if (pickedLat.value == null || pickedLng.value == null) {
-        ElMessage.warning('请先在地图上点击选择一个位置');
-        return;
-      }
-      const coordText = `${pickedLat.value},${pickedLng.value}`;
-      const finalAddress = pickedAddressText.value || coordText;
-      if (locationPickerTarget.value === 'start') {
-        waybillForm.startAddress = finalAddress;
-        startPickedLocationText.value = coordText;
-        startPickedAddressText.value = pickedAddressText.value;
-      } else {
-        waybillForm.endAddress = finalAddress;
-        endPickedLocationText.value = coordText;
-        endPickedAddressText.value = pickedAddressText.value;
-      }
-      locationPickerVisible.value = false;
-    };
-
-    const handleCreateWaybill = async () => {
-      if (!waybillFormRef.value) return;
-      await waybillFormRef.value.validate(async (valid: boolean) => {
-        if (valid) {
-          creating.value = true;
-          try {
-            await createWaybill(waybillForm);
-            ElMessage.success('运单创建成功');
-            resetForm();
-            activeTab.value = 'track';
-            loadWaybills();
-          } catch (error: any) {
-            ElMessage.error(error.message || '创建运单失败');
-          } finally {
-            creating.value = false;
-          }
-        }
-      });
-    };
-
-    const resetForm = () => {
-      waybillForm.receivingConsignorId = 0;
-      waybillForm.goodsInformation = '';
-      waybillForm.startAddress = '';
-      waybillForm.endAddress = '';
-      waybillForm.expectedTimeLimit = '';
-      waybillForm.cost = 0;
-      waybillFormRef.value?.resetFields();
-    };
-
-    const loadWaybills = async () => {
-      loading.value = true;
-      try {
-        const result = await queryWaybillsByStatus(queryStatus.value, currentPage.value, pageSize.value);
-        if (result.data) {
-          const pageData = result.data as any;
-          const records: any[] = pageData.records || [];
-          // 1) 过滤掉明确标记为 changed=1 的旧单
-          const filtered = records.filter((w) => w.changed === 0 || w.changed === undefined);
-          // 2) 按业务字段去重（同一运单被复制时，这些字段是一致的），保留“最新且状态优先”的一条
-          const dedupMap = new Map<string, any>();
-          filtered.forEach((w) => {
-            const key = [
-              w.goodsInformation,
-              w.startAddress,
-              w.endAddress,
-              w.expectedTimeLimit,
-              w.cost,
-            ].join('|');
-            const prev = dedupMap.get(key);
-            if (!prev) {
-              dedupMap.set(key, w);
-              return;
-            }
-            // 优先级：已分配/运输中/已完成 > 待分配；同优先级取创建时间更晚的一条
-            const statusPriority = (s: number) => {
-              if (s === 1 || s === 2 || s === 3) return 2;
-              return 1;
-            };
-            const prevPri = statusPriority(prev.status);
-            const curPri = statusPriority(w.status);
-            if (curPri > prevPri) {
-              dedupMap.set(key, w);
-              return;
-            }
-            if (curPri === prevPri) {
-              const prevTime = new Date(prev.createTime).getTime();
-              const curTime = new Date(w.createTime).getTime();
-              if (curTime >= prevTime) {
-                dedupMap.set(key, w);
-              }
-            }
-          });
-          waybillList.value = Array.from(dedupMap.values());
-          total.value = waybillList.value.length;
-        }
-      } catch (error: any) {
-        ElMessage.error(error.message || '加载运单列表失败');
-      } finally {
-        loading.value = false;
-      }
-    };
-
-    const viewWaybillDetail = async (row: WaybillVO) => {
-      try {
-        const result = await getWaybillDetail(row.waybillId);
-        if (result.data) {
-          currentWaybill.value = result.data as unknown as WaybillVO;
-          detailDialogVisible.value = true;
-        }
-      } catch (error: any) {
-        ElMessage.error(error.message || '获取运单详情失败');
-      }
-    };
-
-    const cancelWaybill = async (waybillId: string) => {
-      try {
-        await ElMessageBox.confirm('确定要取消该运单吗？', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning',
-        });
-        await cancelWaybillAPI(waybillId);
-        ElMessage.success('运单已取消');
-        loadWaybills();
-      } catch (error: any) {
-        if (error !== 'cancel') {
-          ElMessage.error(error.message || '取消运单失败');
-        }
-      }
-    };
-
-    const confirmReceive = async (row: WaybillVO) => {
-      try {
-        await ElMessageBox.confirm('确认已收到货物？', '确认签收', {
-          confirmButtonText: '确认',
-          cancelButtonText: '取消',
-          type: 'success',
-        });
-        ElMessage.success('签收成功');
-        loadWaybills();
-      } catch (error) {
-        // 用户取消
-      }
-    };
-
-    const resetProfileForm = () => {
-      profileFormRef.value?.resetFields();
-      // 重新加载用户信息
-      loadUserInfo();
-    };
-
-    const updateProfile = async () => {
-      if (!profileFormRef.value) return;
-
-      try {
-        // 表单验证
-        await profileFormRef.value.validate();
-
-        updating.value = true;
-
-        // 构建更新数据
-        const updateData: ConsignorChangeInfoDTO = {
-          email: profileForm.email,
-        };
-
-        // 如果填写了新密码，需要包含原密码和新密码
-        if (profileForm.newPassword) {
-          updateData.oldPassword = profileForm.oldPassword;
-          updateData.newPassword = profileForm.newPassword;
-        }
-
-        // 调用更新API（使用 /consignor/changeInfo）
-        await changeConsignorInfo(updateData);
-
-        ElMessage.success('个人信息更新成功');
-        
-        // 清空密码字段
-        profileForm.oldPassword = '';
-        profileForm.newPassword = '';
-        profileForm.confirmPassword = '';
-        
-        // 重新加载用户信息
-        await loadUserInfo();
-      } catch (error: any) {
-        if (error.message) {
-          ElMessage.error(error.message);
-        } else {
-          ElMessage.error('更新失败，请稍后重试');
-        }
-      } finally {
-        updating.value = false;
-      }
-    };
-
-    // 初始化地图
-    const initOwnerMap = () => {
-      const container = document.getElementById('mapContainer');
-      if (!container) {
-        console.warn('地图容器不存在');
-        return;
-      }
-
-      // 检查是否已加载高德地图API
-      if (typeof (window as any).AMap === 'undefined') {
-        const apiKey = String(AMAP_API_KEY);
-        if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
-          ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
-          return;
-        }
-        // 动态加载高德地图API（包含地理编码服务）
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geocoder&callback=initOwnerAMap`;
-        script.async = true;
-        (window as any).initOwnerAMap = () => {
-          createOwnerMapInstance();
-        };
-        document.head.appendChild(script);
-      } else {
-        createOwnerMapInstance();
-      }
-    };
-
-    // 创建地图实例
-    const createOwnerMapInstance = () => {
-      const container = document.getElementById('mapContainer');
-      if (!container) return;
-
-      try {
-        ownerMapInstance = new (window as any).AMap.Map('mapContainer', {
-          zoom: DEFAULT_MAP_ZOOM,
-          center: DEFAULT_MAP_CENTER,
-        });
-        refreshOwnerMap();
-      } catch (error) {
-        console.error('地图初始化失败:', error);
-        ElMessage.warning('地图初始化失败，请检查高德地图API配置');
-      }
-    };
-
-    // 常见地址的坐标映射（长春市）
-    const addressMap: Record<string, [number, number]> = {
-      '长春': [125.323544, 43.817071],
-      '长春市': [125.323544, 43.817071],
-      '长春工业大学': [125.2875, 43.8964],
-      '长春工业大学北湖西区': [125.2875, 43.8964],
-      '长春工业大学北湖校区': [125.2875, 43.8964],
-      '吉林大学': [125.2985, 43.8844],
-      '吉林大学前卫校区': [125.2985, 43.8844],
-      '宽城': [125.3200, 43.9000],
-      '宽城区': [125.3200, 43.9000],
-      '南关': [125.3300, 43.8600],
-      '南关区': [125.3300, 43.8600],
-      '朝阳': [125.3000, 43.8300],
-      '朝阳区': [125.3000, 43.8300],
-      '绿园': [125.2500, 43.8800],
-      '绿园区': [125.2500, 43.8800],
-      '二道': [125.3800, 43.8700],
-      '二道区': [125.3800, 43.8700],
-      '双阳': [125.6500, 43.5200],
-      '双阳区': [125.6500, 43.5200],
-      '净月': [125.4500, 43.8000],
-      '净月区': [125.4500, 43.8000],
-      '净月潭': [125.4500, 43.8000],
-      '长春站': [125.3235, 43.9065],
-      '长春火车站': [125.3235, 43.9065],
-      '长春西站': [125.2000, 43.8500],
-      '龙嘉机场': [125.7000, 44.0000],
-      '长春龙嘉国际机场': [125.7000, 44.0000],
-      '人民广场': [125.3200, 43.8900],
-      '文化广场': [125.3100, 43.8800],
-      '南湖公园': [125.3000, 43.8500],
-      '伪满皇宫': [125.3500, 43.9200],
-      '长影世纪城': [125.4500, 43.7800],
-      '欧亚卖场': [125.2500, 43.8600],
-      '红旗街': [125.2900, 43.8700],
-      '重庆路': [125.3200, 43.8900],
-      '桂林路': [125.3100, 43.8700],
-      '汽车厂': [125.2200, 43.8500],
-      '一汽': [125.2200, 43.8500],
-      '一汽大众': [125.2200, 43.8500],
-    };
-
-    // 地理编码：将地址转换为坐标（使用高德地图Web服务API）
-    const geocodeAddress = (address: string): Promise<[number, number] | null> => {
-      return new Promise((resolve) => {
-        try {
-          if (!address) {
-            resolve(null);
-            return;
-          }
-
-          // 1. 先检查地址映射
-          const trimmedAddress = address.trim();
-          if (addressMap[trimmedAddress]) {
-            console.log(`使用地址映射: ${trimmedAddress} -> [${addressMap[trimmedAddress][0]}, ${addressMap[trimmedAddress][1]}]`);
-            resolve(addressMap[trimmedAddress]);
-            return;
-          }
-
-          // 2. 尝试解析坐标格式 \"lat,lng\"
-          const coordMatch = address.match(/([\\d.]+),\\s*([\\d.]+)/);
-          if (coordMatch) {
-            resolve([parseFloat(coordMatch[2]), parseFloat(coordMatch[1])]); // [lng, lat]
-            return;
-          }
-
-          // 使用高德地图Web服务API进行地理编码（更可靠）
-          const apiKey = String(AMAP_API_KEY);
-          const encodedAddress = encodeURIComponent(address);
-          const url = `https://restapi.amap.com/v3/geocode/geo?key=${apiKey}&address=${encodedAddress}&city=长春市`;
-          
-          // 添加超时处理（15秒）
-          const timeout = setTimeout(() => {
-            console.warn(`地理编码超时: ${address}`);
-            resolve(null);
-          }, 15000);
-
-          fetch(url)
-            .then(response => response.json())
-            .then(data => {
-              clearTimeout(timeout);
-              if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
-                const location = data.geocodes[0].location.split(',');
-                const lng = parseFloat(location[0]);
-                const lat = parseFloat(location[1]);
-                console.log(`地理编码成功: ${address} -> [${lng}, ${lat}]`);
-                resolve([lng, lat]);
-              } else {
-                console.warn(`地理编码失败: ${address}`, data);
-                resolve(null);
-              }
-            })
-            .catch(error => {
-              clearTimeout(timeout);
-              console.error(`地理编码请求失败: ${address}`, error);
-              // 如果Web API失败，尝试使用JS API
-              tryGeocodeWithJSAPI(address, resolve);
-            });
-        } catch (err) {
-          console.error(`地理编码处理异常: ${address}`, err);
-          resolve(null);
-        }
-      });
-    };
-
-    // 备用方案：使用JS API进行地理编码
-    const tryGeocodeWithJSAPI = (address: string, resolve: (value: [number, number] | null) => void) => {
-      if (typeof (window as any).AMap === 'undefined') {
-        resolve(null);
-        return;
-      }
-
-      const AMap = (window as any).AMap;
       const timeout = setTimeout(() => {
         resolve(null);
-      }, 10000);
+      }, 15000);
 
-      // 检查 Geocoder 是否已加载
-      if (AMap.Geocoder) {
-        try {
-          const geocoder = new AMap.Geocoder({
-            city: '长春市',
-          });
-          geocoder.getLocation(address, (status: string, result: any) => {
-            clearTimeout(timeout);
-            if (status === 'complete' && result.geocodes && result.geocodes.length > 0) {
-              const location = result.geocodes[0].location;
-              console.log(`地理编码成功(JS API): ${address} -> [${location.lng}, ${location.lat}]`);
-              resolve([location.lng, location.lat]);
-            } else {
-              console.warn(`地理编码失败(JS API): ${address}`, status);
-              resolve(null);
-            }
-          });
-        } catch (err) {
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
           clearTimeout(timeout);
-          console.error(`地理编码异常(JS API): ${address}`, err);
-          resolve(null);
-        }
-      } else {
-        // 如果未加载，通过插件方式异步加载
-        AMap.plugin('AMap.Geocoder', () => {
-          try {
-            const geocoder = new AMap.Geocoder({
-              city: '长春市',
-            });
-            geocoder.getLocation(address, (status: string, result: any) => {
-              clearTimeout(timeout);
-              if (status === 'complete' && result.geocodes && result.geocodes.length > 0) {
-                const location = result.geocodes[0].location;
-                console.log(`地理编码成功(JS API): ${address} -> [${location.lng}, ${location.lat}]`);
-                resolve([location.lng, location.lat]);
-              } else {
-                console.warn(`地理编码失败(JS API): ${address}`, status);
-                resolve(null);
-              }
-            });
-          } catch (err) {
-            clearTimeout(timeout);
-            console.error(`地理编码异常(JS API): ${address}`, err);
+          if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
+            const location = data.geocodes[0].location.split(',');
+            const lng = parseFloat(location[0]);
+            const lat = parseFloat(location[1]);
+            resolve([lng, lat]);
+          } else {
             resolve(null);
           }
+        })
+        .catch(error => {
+          clearTimeout(timeout);
+          resolve(null);
         });
+    } catch (err) {
+      resolve(null);
+    }
+  });
+};
+
+// 刷新地图上的运单位置
+const refreshOwnerMap = async () => {
+  if (!ownerMapInstance) {
+    setTimeout(() => {
+      if (ownerMapInstance) {
+        refreshOwnerMap();
       }
-    };
+    }, 1000);
+    return;
+  }
 
-    // 刷新地图上的运单位置
-    const refreshOwnerMap = async () => {
-      if (!ownerMapInstance) {
-        console.log('地图实例不存在，正在初始化...');
-        initOwnerMap();
-        // 等待地图初始化完成
-        setTimeout(() => {
-          if (ownerMapInstance) {
-            refreshOwnerMap();
-          }
-        }, 1000);
-        return;
-      }
+  ownerMarkers.forEach(marker => {
+    ownerMapInstance.remove(marker);
+  });
+  ownerMarkers = [];
 
-      // 清除现有标记
-      ownerMarkers.forEach(marker => {
-        ownerMapInstance.remove(marker);
-      });
-      ownerMarkers = [];
+  try {
+    if (waybillList.value.length === 0) {
+      await loadWaybills();
+    }
 
-      try {
-        // 检查运单列表是否已加载
-        if (waybillList.value.length === 0) {
-          console.log('运单列表为空，正在加载...');
-          await loadWaybills();
-        }
+    const waybillsToShow = selectedWaybillId.value
+      ? waybillList.value.filter(w => w.waybillId === selectedWaybillId.value)
+      : waybillList.value.filter(w => w.status === 1 || w.status === 2);
 
-        // 获取要显示的运单
-        const waybillsToShow = selectedWaybillId.value
-          ? waybillList.value.filter(w => w.waybillId === selectedWaybillId.value)
-          : waybillList.value.filter(w => w.status === 1 || w.status === 2); // 只显示已分配或运输中的运单
+    if (waybillsToShow.length === 0) {
+      ElMessage.info('当前没有可追踪的运单（只显示已分配或运输中的运单）');
+      return;
+    }
 
-        console.log(`准备显示 ${waybillsToShow.length} 个运单`);
+    let successCount = 0;
+    let failCount = 0;
 
-        if (waybillsToShow.length === 0) {
-          ElMessage.info('当前没有可追踪的运单（只显示已分配或运输中的运单）');
-          return;
-        }
-
-        // 统计信息
-        let successCount = 0;
-        let failCount = 0;
-        const failedAddresses: string[] = [];
-
-        for (const waybill of waybillsToShow) {
-          console.log(`处理运单 ${waybill.waybillIdentification}: ${waybill.startAddress} -> ${waybill.endAddress}`);
-          
-          // 显示起点
-          const startCoords = await geocodeAddress(waybill.startAddress);
-          if (startCoords) {
-            try {
-              const startMarker = new (window as any).AMap.Marker({
-                position: startCoords,
-                title: `起点: ${waybill.startAddress}`,
-                icon: new (window as any).AMap.Icon({
-                  size: new (window as any).AMap.Size(32, 32),
-                  image: 'https://webapi.amap.com/theme/v1.3/markers/n/start.png',
-                }),
-                label: {
-                  content: '起点',
-                  direction: 'right',
-                },
-              });
-              startMarker.setMap(ownerMapInstance);
-              ownerMarkers.push(startMarker);
-              console.log(`起点标记已添加: ${waybill.startAddress} -> [${startCoords[0]}, ${startCoords[1]}]`);
-            } catch (err) {
-              console.error(`创建起点标记失败: ${waybill.startAddress}`, err);
-              failCount++;
-            }
-          } else {
-            console.warn(`起点地址无法解析: ${waybill.startAddress}`);
-            failedAddresses.push(`起点: ${waybill.startAddress}`);
-            failCount++;
-          }
-
-          // 显示终点
-          const endCoords = await geocodeAddress(waybill.endAddress);
-          if (endCoords) {
-            try {
-              const endMarker = new (window as any).AMap.Marker({
-                position: endCoords,
-                title: `终点: ${waybill.endAddress}`,
-                icon: new (window as any).AMap.Icon({
-                  size: new (window as any).AMap.Size(32, 32),
-                  image: 'https://webapi.amap.com/theme/v1.3/markers/n/end.png',
-                }),
-                label: {
-                  content: '终点',
-                  direction: 'right',
-                },
-              });
-              endMarker.setMap(ownerMapInstance);
-              ownerMarkers.push(endMarker);
-              console.log(`终点标记已添加: ${waybill.endAddress} -> [${endCoords[0]}, ${endCoords[1]}]`);
-            } catch (err) {
-              console.error(`创建终点标记失败: ${waybill.endAddress}`, err);
-              failCount++;
-            }
-          } else {
-            console.warn(`终点地址无法解析: ${waybill.endAddress}`);
-            failedAddresses.push(`终点: ${waybill.endAddress}`);
-            failCount++;
-          }
-
-          // 如果有起点和终点，绘制路线
-          if (startCoords && endCoords) {
-            try {
-              const polyline = new (window as any).AMap.Polyline({
-                path: [startCoords, endCoords],
-                strokeColor: '#3366FF',
-                strokeWeight: 3,
-                strokeStyle: 'solid',
-              });
-              polyline.setMap(ownerMapInstance);
-              ownerMarkers.push(polyline);
-              successCount++;
-              console.log(`路线已绘制: ${waybill.startAddress} -> ${waybill.endAddress}`);
-            } catch (err) {
-              console.error(`绘制路线失败:`, err);
-            }
-          }
-        }
-
-        // 如果有标记，调整地图视野
-        if (ownerMarkers.length > 0) {
-          ownerMapInstance.setFitView(ownerMarkers);
-          console.log(`成功显示 ${ownerMarkers.length} 个标记`);
-          if (failCount > 0) {
-            ElMessage.warning(`成功显示 ${successCount} 个运单，${failCount} 个地址解析失败`);
-          } else {
-            ElMessage.success(`成功显示 ${successCount} 个运单的位置`);
-          }
-        } else {
-          ElMessage.warning('没有运单位置可以显示在地图上。请检查运单地址是否正确');
-          console.warn('没有可显示的运单位置', {
-            totalWaybills: waybillsToShow.length,
-            failedAddresses,
+    for (const waybill of waybillsToShow) {
+      const startCoords = await geocodeAddress(waybill.startAddress);
+      if (startCoords) {
+        try {
+          const startMarker = new (window as any).AMap.Marker({
+            position: startCoords,
+            title: `起点: ${waybill.startAddress}`,
+            icon: new (window as any).AMap.Icon({
+              size: new (window as any).AMap.Size(32, 32),
+              image: 'https://webapi.amap.com/theme/v1.3/markers/n/start.png',
+            }),
+            label: {
+              content: '起点',
+              direction: 'right',
+            },
           });
+          startMarker.setMap(ownerMapInstance);
+          ownerMarkers.push(startMarker);
+        } catch (err) {
+          failCount++;
         }
-      } catch (error: any) {
-        console.error('刷新地图异常:', error);
-        ElMessage.error('刷新地图失败: ' + (error.message || '未知错误'));
+      } else {
+        failCount++;
       }
-    };
 
-    // 运单选择变化
-    const onWaybillSelectChange = () => {
-      refreshOwnerMap();
-    };
-
-    // 显示全部运单
-    const showAllWaybills = () => {
-      selectedWaybillId.value = null;
-      refreshOwnerMap();
-    };
-
-    const handleLogout = async () => {
-      try {
-        clearAuth();
-        ElMessage.success('已退出登录');
-        router.push('/login');
-      } catch (error) {
-        router.push('/login');
+      const endCoords = await geocodeAddress(waybill.endAddress);
+      if (endCoords) {
+        try {
+          const endMarker = new (window as any).AMap.Marker({
+            position: endCoords,
+            title: `终点: ${waybill.endAddress}`,
+            icon: new (window as any).AMap.Icon({
+              size: new (window as any).AMap.Size(32, 32),
+              image: 'https://webapi.amap.com/theme/v1.3/markers/n/end.png',
+            }),
+            label: {
+              content: '终点',
+              direction: 'right',
+            },
+          });
+          endMarker.setMap(ownerMapInstance);
+          ownerMarkers.push(endMarker);
+        } catch (err) {
+          failCount++;
+        }
+      } else {
+        failCount++;
       }
-    };
 
-    return {
-      activeTab,
-      loading,
-      creating,
-      waybillForm,
-      waybillRules,
-      waybillFormRef,
-      waybillList,
-      currentPage,
-      pageSize,
-      total,
-      queryStatus,
-      detailDialogVisible,
-      currentWaybill,
-      userInfo,
-      profileForm,
-      profileFormRef,
-      profileRules,
-      updating,
-      handleTabChange,
-      handleCreateWaybill,
-      resetForm,
-      loadWaybills,
-      viewWaybillDetail,
-      cancelWaybill,
-      confirmReceive,
-      updateProfile,
-      resetProfileForm,
-      handleLogout,
-      getStatusDesc,
-      getStatusType,
-      selectedWaybillId,
-      refreshOwnerMap,
-      onWaybillSelectChange,
-      showAllWaybills,
-      // 地址选择地图相关
-      locationPickerVisible,
-      locationPickerTitle,
-      pickedLocationText,
-      openLocationPicker,
-      confirmLocationPick,
-    };
-  },
-});
+      if (startCoords && endCoords) {
+        try {
+          const polyline = new (window as any).AMap.Polyline({
+            path: [startCoords, endCoords],
+            strokeColor: '#3366FF',
+            strokeWeight: 3,
+            strokeStyle: 'solid',
+          });
+          polyline.setMap(ownerMapInstance);
+          ownerMarkers.push(polyline);
+          successCount++;
+        } catch (err) {
+          console.error(`绘制路线失败:`, err);
+        }
+      }
+    }
+
+    if (ownerMarkers.length > 0) {
+      ownerMapInstance.setFitView(ownerMarkers);
+      if (failCount > 0) {
+        ElMessage.warning(`成功显示 ${successCount} 个运单，${failCount} 个地址解析失败`);
+      } else {
+        ElMessage.success(`成功显示 ${successCount} 个运单的位置`);
+      }
+    } else {
+      ElMessage.warning('没有运单位置可以显示在地图上。请检查运单地址是否正确');
+    }
+  } catch (error: any) {
+    console.error('刷新地图异常:', error);
+    ElMessage.error('刷新地图失败: ' + (error.message || '未知错误'));
+  }
+};
+
+// 运单选择变化
+const onWaybillSelectChange = () => {
+  refreshOwnerMap();
+};
+
+// 显示全部运单
+const showAllWaybills = () => {
+  selectedWaybillId.value = null;
+  refreshOwnerMap();
+};
+
+const handleLogout = async () => {
+  try {
+    clearAuth();
+    ElMessage.success('已退出登录');
+    router.push('/login');
+  } catch (error) {
+    router.push('/login');
+  }
+};
 </script>
 
 <style scoped>

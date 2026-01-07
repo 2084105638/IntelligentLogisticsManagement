@@ -262,8 +262,8 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, reactive, ref, onMounted } from 'vue';
+<script setup lang="ts">
+import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
@@ -280,325 +280,280 @@ import {
 } from '../api';
 import { clearAuth } from '../utils/auth';
 
-export default defineComponent({
-  name: 'AdminDashboard',
-  setup() {
-    const router = useRouter();
-    const activeTab = ref('users');
-    const dataTab = ref('carType');
-    const loading = ref(false);
-    const logLoading = ref(false);
-    const userList = ref<UserVO[]>([]);
-    const carTypeList = ref<any[]>([]);
-    const pricingList = ref<any[]>([]);
-    const logList = ref<any[]>([]);
-    const userPage = ref(1);
-    const userPageSize = ref(10);
-    const userTotal = ref(0);
-    const logPage = ref(1);
-    const logPageSize = ref(10);
-    const logTotal = ref(0);
+const router = useRouter();
+const activeTab = ref('users');
+const dataTab = ref('carType');
+const loading = ref(false);
+const logLoading = ref(false);
+const userList = ref<UserVO[]>([]);
+const carTypeList = ref<any[]>([]);
+const pricingList = ref<any[]>([]);
+const logList = ref<any[]>([]);
+const userPage = ref(1);
+const userPageSize = ref(10);
+const userTotal = ref(0);
+const logPage = ref(1);
+const logPageSize = ref(10);
+const logTotal = ref(0);
 
-    const userQuery = reactive({
-      role: '',
-      keyword: '',
-    });
-
-    const userDialogVisible = ref(false);
-    const isEdit = ref(false);
-    const userFormRef = ref();
-    const userForm = reactive<UserCreateDTO & { userId?: number }>({
-      type: 1,
-      username: '',
-      password: '',
-      email: '',
-      phone: '',
-    });
-
-    const userFormRules = {
-      type: [{ required: true, message: '请选择用户角色', trigger: 'change' }],
-      username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-      password: [
-        {
-          validator: (_: any, value: string, callback: (error?: Error) => void) => {
-            // 新增时必须填密码，编辑时可空
-            if (!isEdit.value && (!value || !value.trim())) {
-              callback(new Error('请输入密码'));
-            } else {
-              callback();
-            }
-          },
-          trigger: 'blur',
-        },
-      ],
-      phone: [
-        {
-          validator: (_: any, value: string, callback: (error?: Error) => void) => {
-            // 货主/司机必须提供手机号，调度员可选
-            if ((userForm.type === 1 || userForm.type === 3) && (!value || !/^1[3-9]\d{9}$/.test(value))) {
-              callback(new Error('请输入有效的手机号'));
-            } else {
-              callback();
-            }
-          },
-          trigger: 'blur',
-        },
-      ],
-      email: [
-        {
-          validator: (_: any, value: string, callback: (error?: Error) => void) => {
-            // 货主/司机必须提供邮箱，调度员可选
-            const emailRequired = userForm.type === 1 || userForm.type === 3;
-            if (emailRequired && (!value || !/^[^@]+@[^@]+\.[^@]+$/.test(value))) {
-              callback(new Error('请输入正确的邮箱'));
-            } else if (value && !/^[^@]+@[^@]+\.[^@]+$/.test(value)) {
-              callback(new Error('请输入正确的邮箱'));
-            } else {
-              callback();
-            }
-          },
-          trigger: 'blur',
-        },
-      ],
-    };
-
-    const logQuery = reactive({
-      dateRange: [] as string[],
-      action: '',
-    });
-
-    const systemStats = reactive({
-      apiCalls: 0,
-      activeUsers: 0,
-      dbConnections: 0,
-      cpuUsage: 0,
-    });
-
-    onMounted(() => {
-      loadUsers();
-      loadSystemStats();
-    });
-
-    const loadUsers = async () => {
-      loading.value = true;
-      try {
-        const dto: UserQueryDTO = {
-          current: userPage.value,
-          size: userPageSize.value,
-        };
-        if (userQuery.role) {
-          dto.type =
-            userQuery.role === 'consignor'
-              ? 1
-              : userQuery.role === 'dispatcher'
-                ? 2
-                : 3;
-        }
-        if (userQuery.keyword) {
-          dto.username = userQuery.keyword;
-        }
-        const result = await queryUsers(dto);
-        const pageData = result.data as any;
-        userList.value = (pageData.records || []) as UserVO[];
-        userTotal.value = pageData.total || 0;
-      } catch (error: any) {
-        ElMessage.error(error.message || '加载用户列表失败');
-      } finally {
-        loading.value = false;
-      }
-    };
-
-    const loadLogs = async () => {
-      logLoading.value = true;
-      try {
-        // TODO: 调用API获取操作日志
-        // const result = await getLogs(logQuery, logPage.value, logPageSize.value);
-        // logList.value = result.data.records || [];
-        // logTotal.value = result.data.total || 0;
-        
-        // 模拟数据
-        logList.value = [];
-        logTotal.value = 0;
-      } catch (error: any) {
-        ElMessage.error(error.message || '加载日志失败');
-      } finally {
-        logLoading.value = false;
-      }
-    };
-
-    const loadSystemStats = () => {
-      // TODO: 调用API获取系统统计
-      // 模拟数据
-      systemStats.apiCalls = 1234;
-      systemStats.activeUsers = 56;
-      systemStats.dbConnections = 8;
-      systemStats.cpuUsage = 45;
-    };
-
-    const openCreateUserDialog = () => {
-      isEdit.value = false;
-      userForm.userId = undefined;
-      userForm.type = 1;
-      userForm.username = '';
-      userForm.password = '';
-      userForm.email = '';
-      userForm.phone = '';
-      userDialogVisible.value = true;
-    };
-
-    const openEditUserDialog = (row: UserVO) => {
-      isEdit.value = true;
-      userForm.userId = row.userId;
-      userForm.type = row.type;
-      userForm.username = row.username;
-      userForm.email = row.email || '';
-      userForm.phone = row.phone || '';
-      userForm.password = '';
-      userDialogVisible.value = true;
-    };
-
-    const submitUserForm = async () => {
-      if (!userFormRef.value) return;
-      try {
-        await userFormRef.value.validate();
-      } catch (e) {
-        ElMessage.warning('请先修正表单校验错误');
-        return;
-      }
-      try {
-        if (isEdit.value && userForm.userId) {
-          const dto: UserUpdateDTO = {
-            username: userForm.username,
-            email: userForm.email,
-            phone: userForm.phone,
-            password: userForm.password || undefined,
-          };
-          console.log('admin updateUser payload:', dto, 'userId:', userForm.userId);
-          await updateUser(userForm.userId, dto);
-          ElMessage.success('用户信息更新成功');
-        } else {
-          const dto: UserCreateDTO = {
-            type: userForm.type,
-            username: userForm.username,
-            password: userForm.password,
-            email: userForm.email,
-            phone: userForm.phone,
-          };
-          console.log('admin createUser payload:', dto);
-          await createUser(dto);
-          ElMessage.success('用户创建成功');
-        }
-        userDialogVisible.value = false;
-        loadUsers();
-      } catch (error: any) {
-        console.error('admin create/update user error:', error);
-        ElMessage.error(error.message || '保存失败');
-      }
-    };
-
-    const toggleUserStatus = async (user: UserVO) => {
-      try {
-        const newStatus = user.status === 1 ? 0 : 1;
-        await updateUserStatus(user.userId, newStatus);
-        ElMessage.success('操作成功');
-        loadUsers();
-      } catch (error: any) {
-        ElMessage.error(error.message || '操作失败');
-      }
-    };
-
-    const deleteUser = async (userId: number) => {
-      try {
-        await ElMessageBox.confirm('确定要删除该用户吗？', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning',
-        });
-        await deleteUserApi(userId);
-        ElMessage.success('删除成功');
-        loadUsers();
-      } catch (error: any) {
-        if (error !== 'cancel') {
-          ElMessage.error(error.message || '删除失败');
-        }
-      }
-    };
-
-    const showCarTypeDialog = () => {
-      ElMessage.info('车型管理功能待实现');
-    };
-
-    const editCarType = (row: any) => {
-      ElMessage.info('编辑车型功能待实现');
-    };
-
-    const deleteCarType = (id: number) => {
-      ElMessage.info('删除车型功能待实现');
-    };
-
-    const showPricingDialog = () => {
-      ElMessage.info('计费规则管理功能待实现');
-    };
-
-    const editPricing = (row: any) => {
-      ElMessage.info('编辑计费规则功能待实现');
-    };
-
-    const deletePricing = (id: number) => {
-      ElMessage.info('删除计费规则功能待实现');
-    };
-
-    const handleLogout = async () => {
-      try {
-        await adminLogout();
-      } catch {
-        // 忽略登出错误
-      }
-      clearAuth();
-      router.push('/login');
-    };
-
-    return {
-      activeTab,
-      dataTab,
-      loading,
-      logLoading,
-      userList,
-      carTypeList,
-      pricingList,
-      logList,
-      userPage,
-      userPageSize,
-      userTotal,
-      logPage,
-      logPageSize,
-      logTotal,
-      userQuery,
-      logQuery,
-      systemStats,
-      loadUsers,
-      loadLogs,
-      loadSystemStats,
-      userDialogVisible,
-      isEdit,
-      userFormRef,
-      userForm,
-      userFormRules,
-      openCreateUserDialog,
-      openEditUserDialog,
-      submitUserForm,
-      toggleUserStatus,
-      deleteUser,
-      showCarTypeDialog,
-      editCarType,
-      deleteCarType,
-      showPricingDialog,
-      editPricing,
-      deletePricing,
-      handleLogout,
-    };
-  },
+const userQuery = reactive({
+  role: '',
+  keyword: '',
 });
+
+const userDialogVisible = ref(false);
+const isEdit = ref(false);
+const userFormRef = ref();
+const userForm = reactive<UserCreateDTO & { userId?: number }>({
+  type: 1,
+  username: '',
+  password: '',
+  email: '',
+  phone: '',
+});
+
+const userFormRules = {
+  type: [{ required: true, message: '请选择用户角色', trigger: 'change' }],
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  password: [
+    {
+      validator: (_: any, value: string, callback: (error?: Error) => void) => {
+        // 新增时必须填密码，编辑时可空
+        if (!isEdit.value && (!value || !value.trim())) {
+          callback(new Error('请输入密码'));
+        } else {
+          callback();
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+  phone: [
+    {
+      validator: (_: any, value: string, callback: (error?: Error) => void) => {
+        // 货主/司机必须提供手机号，调度员可选
+        if ((userForm.type === 1 || userForm.type === 3) && (!value || !/^1[3-9]\d{9}$/.test(value))) {
+          callback(new Error('请输入有效的手机号'));
+        } else {
+          callback();
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+  email: [
+    {
+      validator: (_: any, value: string, callback: (error?: Error) => void) => {
+        // 货主/司机必须提供邮箱，调度员可选
+        const emailRequired = userForm.type === 1 || userForm.type === 3;
+        if (emailRequired && (!value || !/^[^@]+@[^@]+\.[^@]+$/.test(value))) {
+          callback(new Error('请输入正确的邮箱'));
+        } else if (value && !/^[^@]+@[^@]+\.[^@]+$/.test(value)) {
+          callback(new Error('请输入正确的邮箱'));
+        } else {
+          callback();
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+};
+
+const logQuery = reactive({
+  dateRange: [] as string[],
+  action: '',
+});
+
+const systemStats = reactive({
+  apiCalls: 0,
+  activeUsers: 0,
+  dbConnections: 0,
+  cpuUsage: 0,
+});
+
+onMounted(() => {
+  loadUsers();
+  loadSystemStats();
+});
+
+const loadUsers = async () => {
+  loading.value = true;
+  try {
+    const dto: UserQueryDTO = {
+      current: userPage.value,
+      size: userPageSize.value,
+    };
+    if (userQuery.role) {
+      dto.type =
+        userQuery.role === 'consignor'
+          ? 1
+          : userQuery.role === 'dispatcher'
+            ? 2
+            : 3;
+    }
+    if (userQuery.keyword) {
+      dto.username = userQuery.keyword;
+    }
+    const result = await queryUsers(dto);
+    const pageData = result.data as any;
+    userList.value = (pageData.records || []) as UserVO[];
+    userTotal.value = pageData.total || 0;
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载用户列表失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const loadLogs = async () => {
+  logLoading.value = true;
+  try {
+    // TODO: 调用API获取操作日志
+    // const result = await getLogs(logQuery, logPage.value, logPageSize.value);
+    // logList.value = result.data.records || [];
+    // logTotal.value = result.data.total || 0;
+    
+    // 模拟数据
+    logList.value = [];
+    logTotal.value = 0;
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载日志失败');
+  } finally {
+    logLoading.value = false;
+  }
+};
+
+const loadSystemStats = () => {
+  // TODO: 调用API获取系统统计
+  // 模拟数据
+  systemStats.apiCalls = 1234;
+  systemStats.activeUsers = 56;
+  systemStats.dbConnections = 8;
+  systemStats.cpuUsage = 45;
+};
+
+const openCreateUserDialog = () => {
+  isEdit.value = false;
+  userForm.userId = undefined;
+  userForm.type = 1;
+  userForm.username = '';
+  userForm.password = '';
+  userForm.email = '';
+  userForm.phone = '';
+  userDialogVisible.value = true;
+};
+
+const openEditUserDialog = (row: UserVO) => {
+  isEdit.value = true;
+  userForm.userId = row.userId;
+  userForm.type = row.type;
+  userForm.username = row.username;
+  userForm.email = row.email || '';
+  userForm.phone = row.phone || '';
+  userForm.password = '';
+  userDialogVisible.value = true;
+};
+
+const submitUserForm = async () => {
+  if (!userFormRef.value) return;
+  try {
+    await userFormRef.value.validate();
+  } catch (e) {
+    ElMessage.warning('请先修正表单校验错误');
+    return;
+  }
+  try {
+    if (isEdit.value && userForm.userId) {
+      const dto: UserUpdateDTO = {
+        username: userForm.username,
+        email: userForm.email,
+        phone: userForm.phone,
+        password: userForm.password || undefined,
+      };
+      console.log('admin updateUser payload:', dto, 'userId:', userForm.userId);
+      await updateUser(userForm.userId, dto);
+      ElMessage.success('用户信息更新成功');
+    } else {
+      const dto: UserCreateDTO = {
+        type: userForm.type,
+        username: userForm.username,
+        password: userForm.password,
+        email: userForm.email,
+        phone: userForm.phone,
+      };
+      console.log('admin createUser payload:', dto);
+      await createUser(dto);
+      ElMessage.success('用户创建成功');
+    }
+    userDialogVisible.value = false;
+    loadUsers();
+  } catch (error: any) {
+    console.error('admin create/update user error:', error);
+    ElMessage.error(error.message || '保存失败');
+  }
+};
+
+const toggleUserStatus = async (user: UserVO) => {
+  try {
+    const newStatus = user.status === 1 ? 0 : 1;
+    await updateUserStatus(user.userId, newStatus);
+    ElMessage.success('操作成功');
+    loadUsers();
+  } catch (error: any) {
+    ElMessage.error(error.message || '操作失败');
+  }
+};
+
+const deleteUser = async (userId: number) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该用户吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    });
+    await deleteUserApi(userId);
+    ElMessage.success('删除成功');
+    loadUsers();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除失败');
+    }
+  }
+};
+
+const showCarTypeDialog = () => {
+  ElMessage.info('车型管理功能待实现');
+};
+
+const editCarType = (row: any) => {
+  ElMessage.info('编辑车型功能待实现');
+};
+
+const deleteCarType = (id: number) => {
+  ElMessage.info('删除车型功能待实现');
+};
+
+const showPricingDialog = () => {
+  ElMessage.info('计费规则管理功能待实现');
+};
+
+const editPricing = (row: any) => {
+  ElMessage.info('编辑计费规则功能待实现');
+};
+
+const deletePricing = (id: number) => {
+  ElMessage.info('删除计费规则功能待实现');
+};
+
+const handleLogout = async () => {
+  try {
+    await adminLogout();
+  } catch {
+    // 忽略登出错误
+  }
+  clearAuth();
+  router.push('/login');
+};
 </script>
 
 <style scoped>
