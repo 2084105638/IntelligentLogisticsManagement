@@ -2,7 +2,6 @@ package com.sylphy.common;
 
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.RandomUtil;
-import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 
 /**
  * Token 工具类
@@ -11,7 +10,7 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
  * @since 2026/1/3
  */
 public class StringTools {
-    
+
     /**
      * 生成 Token
      *
@@ -20,12 +19,12 @@ public class StringTools {
     public static String generateToken() {
         return IdUtil.simpleUUID();
     }
-    
+
     public static String randomUsername() {
         return RandomUtil.randomString("user", 10);
     }
-    
+
     public static Long randomWaybillIdentification() {
-        return RandomUtil.randomLong();
+        return RandomUtil.randomLong(0, Long.MAX_VALUE);
     }
 }

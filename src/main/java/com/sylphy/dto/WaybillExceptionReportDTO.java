@@ -12,13 +12,13 @@ import java.util.Date;
  */
 @Data
 public class WaybillExceptionReportDTO {
-    
-    @NotNull(message = "运单ID不能为空")
-    private Long waybillId;
-    
+
+    @NotNull(message = "运单标识ID不能为空")
+    private Long waybillIdentification;
+
     @NotBlank(message = "异常描述不能为空")
     private String description;
-    
+
     @NotNull(message = "异常发生时间不能为空")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date exceptionDate;

@@ -17,7 +17,7 @@ public class WaybillAssignment implements Serializable {
     /**
      * 运单操作 id
      */
-    @TableId("table_id")
+    @TableId("assignment_id")
     private Long assignmentId;
     
     /**

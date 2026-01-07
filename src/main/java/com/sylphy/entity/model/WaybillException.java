@@ -4,9 +4,10 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
 import java.io.Serializable;
 import java.util.Date;
-import lombok.Data;
 
 /**
  * 运单异常实体
@@ -19,30 +20,30 @@ public class WaybillException implements Serializable {
      */
     @TableId(value = "exception_id", type = IdType.ASSIGN_ID)
     private Long exceptionId;
-    
+
     /**
      * 关联的运单 id
      */
-    @TableField("waybill_id")
-    private Long waybillId;
-    
+    @TableField("waybill_identification")
+    private Long waybillIdentification;
+
     /**
-     * 上报司机 id
+     * 车辆id
      */
-    @TableField("driver_id")
-    private Long driverId;
-    
+    @TableField("car_id")
+    private Long carId;
+
     /**
      * 异常描述
      */
     @TableField("description")
     private String description;
-    
+
     /**
      * 异常时间
      */
     @TableField("exception_date")
     private Date exceptionDate;
-    
+
     private static final long serialVersionUID = 1L;
 }
