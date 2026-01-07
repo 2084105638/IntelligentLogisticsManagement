@@ -9,6 +9,7 @@ import com.sylphy.entity.model.Consignor;
 import com.sylphy.service.ConsignorService;
 import com.sylphy.vo.ConsignorLoginVO;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
@@ -85,5 +86,26 @@ public class ConsignorController {
         // 清空密码字段
         consignor.setPassword(null);
         return Result.success(consignor);
+    }
+
+    /**
+     * 查询所有货主（收货人）
+     */
+    @GetMapping("/list")
+    public Result<List<Consignor>> listAllConsignors(@RequestHeader("Authorization") String token) {
+        Long consignorId = redisCache.getConsignorIdByToken(token);
+        if (consignorId == null) {
+            // 这里我们假设只有货主能查？或者调度员也能查？
+            // 鉴权逻辑：这里暂时只校验Token有效性，若需要区分角色请扩展
+            // 尝试校验是否是货主登录，或者是否是调度员等。
+            // 简单处理：只要有有效Token（Redis中有记录）即可。
+            // 注意：RedisCache 中不同角色存储 Key 可能不同，这里 getConsignorIdByToken 只能取到货主。
+            // 如果调度员也要查，可能需要更通用的鉴权。
+            // 既然是 ConsignorController，通常面向货主端。
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        redisCache.refreshToken(token);
+
+        return Result.success(consignorService.listAllConsignors());
     }
 }

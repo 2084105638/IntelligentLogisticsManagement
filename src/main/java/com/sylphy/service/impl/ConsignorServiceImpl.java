@@ -14,6 +14,8 @@ import com.sylphy.mapper.ConsignorDao;
 import com.sylphy.mapper.UserDao;
 import com.sylphy.service.ConsignorService;
 import com.sylphy.vo.ConsignorLoginVO;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +60,7 @@ public class ConsignorServiceImpl implements ConsignorService {
         User user = new User();
         user.setUsername(StringTools.randomUsername());
         user.setType(1); // 1:货主
+        user.setStatus(1);
         userDao.insert(user);
 
         // 创建货主
@@ -190,6 +193,15 @@ public class ConsignorServiceImpl implements ConsignorService {
         redisCache.saveConsignorInfo(consignor);
 
         return consignor;
+    }
+
+    @Override
+    public List<Consignor> listAllConsignors() {
+        List<Consignor> consignors = consignorDao.selectList(null);
+        // 脱敏处理，清空密码
+        return consignors.stream()
+                .peek(c -> c.setPassword(null))
+                .collect(Collectors.toList());
     }
 
     /**

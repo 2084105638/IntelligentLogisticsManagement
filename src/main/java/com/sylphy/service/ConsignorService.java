@@ -6,6 +6,8 @@ import com.sylphy.dto.ConsignorRegisterDTO;
 import com.sylphy.entity.model.Consignor;
 import com.sylphy.vo.ConsignorLoginVO;
 
+import java.util.List;
+
 /**
  * 货主 Service 接口
  *
@@ -52,4 +54,11 @@ public interface ConsignorService {
      * @return 更新后的货主信息
      */
     Consignor updateConsignor(Long consignorId, ConsignorChangeInfoDTO changeInfoDTO);
+
+    /**
+     * 获取所有货主列表
+     *
+     * @return 货主列表
+     */
+    List<Consignor> listAllConsignors();
 }
