@@ -55,6 +55,17 @@ export const getConsignorInfo = () => {
   return request.get<Result>('/consignor/info');
 };
 
+// 更新货主信息
+export interface ConsignorUpdateDTO {
+  email?: string;
+  oldPassword?: string;
+  newPassword?: string;
+}
+
+export const updateConsignorInfo = (data: ConsignorUpdateDTO) => {
+  return request.put<Result>('/consignor/update', data);
+};
+
 // ============ 运单相关API ============
 export interface WaybillCreateDTO {
   receivingConsignorId: number;
@@ -75,7 +86,8 @@ export interface WaybillQueryDTO {
 }
 
 export interface WaybillVO {
-  waybillId: string; // 使用字符串避免 Long 精度丢失
+  waybillId: string; // 使用字符串避免 Long 精度丢失（用于API调用）
+  waybillIdentification: string; // 运单业务标识（用于前端显示，唯一标识）
   consignorId: number;
   goodsInformation: string;
   startAddress: string;
@@ -302,9 +314,8 @@ export const getAssignmentHistory = (params: {
 // ============ 司机相关API ============
 export interface DriverRegisterDTO {
   phone: string;
+  email: string;
   password: string;
-  name: string;
-  licenseNumber: string;
 }
 
 export interface DriverLoginDTO {
@@ -322,7 +333,7 @@ export interface DriverLoginVO {
 
 // 运单异常上报 DTO（与后端 WaybillExceptionReportDTO 对齐）
 export interface WaybillExceptionReportDTO {
-  waybillId: string;
+  waybillIdentification: string; // 使用 waybillIdentification 作为业务标识
   description: string;
   exceptionDate: string; // yyyy-MM-dd HH:mm:ss
 }
@@ -369,6 +380,45 @@ export interface AdminLoginVO {
   username: string;
 }
 
+// 用户查询DTO
+export interface UserQueryDTO {
+  type?: number; // 用户类型 0:管理员 1:货主 2:调度员 3:司机
+  username?: string; // 用户名（模糊查询）
+  status?: number; // 账户状态 0:禁用 1:启用
+  current?: number; // 当前页码
+  size?: number; // 每页大小
+}
+
+// 用户创建DTO
+export interface UserCreateDTO {
+  type: number; // 用户类型 1:货主 2:调度员 3:司机
+  username: string; // 用户名
+  password: string; // 密码
+  email?: string; // 邮箱（货主、司机必填）
+  phone?: string; // 手机号（货主、司机必填，调度员可选）
+}
+
+// 用户更新DTO
+export interface UserUpdateDTO {
+  username?: string; // 用户名
+  password?: string; // 密码（为空则不修改）
+  email?: string; // 邮箱
+  phone?: string; // 手机号
+}
+
+// 用户信息VO
+export interface UserVO {
+  userId: number; // 用户ID
+  type: number; // 用户类型 0:管理员 1:货主 2:调度员 3:司机
+  typeDesc: string; // 用户类型描述
+  username: string; // 用户名
+  status: number; // 账户状态 0:禁用 1:启用
+  statusDesc: string; // 状态描述
+  email?: string; // 邮箱
+  phone?: string; // 手机号
+  roleId?: number; // 角色ID（consignorId/dispatcherId/driverId）
+}
+
 // 管理员登录
 export const adminLogin = (data: AdminLoginDTO) => {
   return request.post<Result<AdminLoginVO>>('/admin/login', data);
@@ -379,8 +429,28 @@ export const adminLogout = () => {
   return request.post<Result>('/admin/logout');
 };
 
-// 获取当前管理员信息
-export const getAdminInfo = () => {
-  return request.get<Result>('/admin/me');
+// 查询用户列表（分页）
+export const queryUsers = (data: UserQueryDTO) => {
+  return request.post<Result<PageResult<UserVO>>>('/admin/users/query', data);
+};
+
+// 创建用户（货主、调度员、司机）
+export const createUser = (data: UserCreateDTO) => {
+  return request.post<Result<number>>('/admin/users/create', data);
+};
+
+// 更新用户信息
+export const updateUser = (userId: number, data: UserUpdateDTO) => {
+  return request.put<Result>(`/admin/users/${userId}`, data);
+};
+
+// 删除用户
+export const deleteUser = (userId: number) => {
+  return request.delete<Result>(`/admin/users/${userId}`);
+};
+
+// 禁用/启用用户
+export const updateUserStatus = (userId: number, status: number) => {
+  return request.put<Result>(`/admin/users/${userId}/status?status=${status}`);
 };
 

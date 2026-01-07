@@ -1,22 +1,30 @@
 <template>
     <div class="dashboard">
       <el-container>
-        <el-header>
+        <el-header class="dashboard-header">
           <div class="header-content">
-            <h2>司机工作台</h2>
+            <div class="header-left">
+              <div class="logo">
+                <span class="logo-dot" />
+                <div class="logo-text">
+                  <div class="logo-title">司机工作台</div>
+                  <div class="logo-subtitle">任务接收与状态上报</div>
+                </div>
+              </div>
+            </div>
             <div class="user-info">
-              <span>{{ userInfo?.name || userInfo?.phone || '司机' }}</span>
+              <span class="user-name">{{ userInfo?.name || userInfo?.phone || '司机' }}</span>
               <el-button link @click="handleLogout">退出登录</el-button>
             </div>
           </div>
         </el-header>
-        <el-main>
-          <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+        <el-main class="dashboard-main">
+          <el-tabs v-model="activeTab" @tab-change="handleTabChange" class="dashboard-tabs">
             <!-- 当前任务 -->
             <el-tab-pane label="当前任务" name="current">
-              <el-card>
+              <el-card class="panel-card">
                 <el-table :data="currentTaskList" style="width: 100%" v-loading="currentTaskLoading">
-                  <el-table-column prop="waybillId" label="运单号" width="120" />
+                  <el-table-column prop="waybillIdentification" label="运单号" width="120" />
                   <el-table-column prop="goodsInformation" label="货物信息" width="200" />
                   <el-table-column prop="startAddress" label="提货点" width="150" />
                   <el-table-column prop="endAddress" label="卸货点" width="150" />
@@ -77,9 +85,9 @@
   
             <!-- 历史任务 -->
             <el-tab-pane label="历史任务" name="history">
-              <el-card>
+              <el-card class="panel-card">
                 <el-table :data="historyList" style="width: 100%" v-loading="loading">
-                  <el-table-column prop="waybillId" label="运单号" width="120" />
+                  <el-table-column prop="waybillIdentification" label="运单号" width="120" />
                   <el-table-column prop="goodsInformation" label="货物信息" width="200" />
                   <el-table-column prop="startAddress" label="提货点" width="150" />
                   <el-table-column prop="endAddress" label="卸货点" width="150" />
@@ -127,27 +135,27 @@
             <el-tab-pane label="收入统计" name="income">
               <el-row :gutter="20">
                 <el-col :span="8">
-                  <el-card>
+                  <el-card class="panel-card">
                     <div class="stat-item">
                       <div class="stat-value">¥{{ income.totalIncome.toFixed(2) }}</div>
                       <div class="stat-label">总收入</div>
-        </div>
+                    </div>
                   </el-card>
                 </el-col>
                 <el-col :span="8">
-                  <el-card>
+                  <el-card class="panel-card">
                     <div class="stat-item">
                       <div class="stat-value">{{ income.completedTasks }}</div>
                       <div class="stat-label">已完成任务</div>
-        </div>
-      </el-card>
+                    </div>
+                  </el-card>
                 </el-col>
                 <el-col :span="8">
-                  <el-card>
+                  <el-card class="panel-card">
                     <div class="stat-item">
                       <div class="stat-value">¥{{ income.monthIncome.toFixed(2) }}</div>
                       <div class="stat-label">本月收入</div>
-      </div>
+                    </div>
                   </el-card>
                 </el-col>
               </el-row>
@@ -187,7 +195,7 @@
       <el-dialog v-model="receiptDialogVisible" title="上传电子回单" width="500px">
         <el-form :model="receiptForm" label-width="100px">
           <el-form-item label="运单号">
-            <el-input v-model="receiptForm.waybillId" disabled />
+            <el-input :value="currentTaskDetail?.waybillIdentification || receiptForm.waybillId" disabled />
           </el-form-item>
           <el-form-item label="签收单">
             <el-upload
@@ -228,7 +236,7 @@
       <!-- 任务详情对话框 -->
       <el-dialog v-model="detailDialogVisible" title="任务详情" width="800px">
         <el-descriptions :column="2" border v-if="currentTaskDetail">
-          <el-descriptions-item label="运单号">{{ currentTaskDetail.waybillId }}</el-descriptions-item>
+          <el-descriptions-item label="运单号">{{ currentTaskDetail.waybillIdentification }}</el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag :type="getStatusType(currentTaskDetail.status)">
               {{ getStatusDesc(currentTaskDetail.status) }}
@@ -781,7 +789,7 @@
           const description = `[${typeDesc}] ${issueForm.description || ''}`.trim();
 
           const exceptionData: WaybillExceptionReportDTO = {
-            waybillId: selectedTaskForIssue.value.waybillId,
+            waybillIdentification: selectedTaskForIssue.value.waybillIdentification,
             description: description,
             exceptionDate: new Date().toLocaleString('zh-CN', {
               year: 'numeric',
@@ -814,7 +822,8 @@
       };
   
       const uploadReceipt = (row: WaybillVO) => {
-        receiptForm.waybillId = String(row.waybillId);
+        currentTaskDetail.value = row; // 设置当前任务详情以便显示 waybillIdentification
+        receiptForm.waybillId = String(row.waybillId); // 保留 waybillId 用于API调用
         receiptFileList.value = [];
         goodsFileList.value = [];
         receiptDialogVisible.value = true;
@@ -907,8 +916,21 @@
   
   <style scoped>
   .dashboard {
+    position: relative;
     min-height: 100vh;
-    background-color: #f5f5f5;
+    overflow: hidden;
+    background: radial-gradient(circle at top left, #4f46e5 0, #0f172a 45%, #020617 100%);
+  }
+  
+  .dashboard-header {
+    padding-inline: 0;
+    background: transparent;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  }
+  
+  .dashboard-main {
+    padding-inline: 0;
+    color: #e5e7eb;
   }
   
   .header-content {
@@ -918,10 +940,77 @@
     height: 100%;
   }
   
+  .header-left {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .logo-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.85);
+  }
+  
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .logo-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e5e7eb;
+  }
+  
+  .logo-subtitle {
+    font-size: 12px;
+    color: #cbd5f5;
+  }
+  
   .user-info {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 16px;
+    font-size: 14px;
+  }
+  
+  .user-name {
+    color: #e5e7eb;
+  }
+  
+  .dashboard-tabs :deep(.el-tabs__item) {
+    color: #cbd5f5;
+  }
+  
+  .dashboard-tabs :deep(.el-tabs__item.is-active) {
+    color: #60a5fa;
+  }
+  
+  .dashboard-tabs :deep(.el-tabs__active-bar) {
+    background-color: #60a5fa;
+  }
+  
+  .dashboard-tabs :deep(.el-tabs__nav-wrap::after) {
+    background-color: rgba(148, 163, 184, 0.2);
+  }
+  
+  .panel-card {
+    background: rgba(15, 23, 42, 0.97);
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.5);
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.9);
+  }
+  
+  .panel-card :deep(.el-card__body) {
+    color: #e5e7eb;
   }
   
   .task-card {
@@ -948,13 +1037,21 @@
   .stat-value {
     font-size: 32px;
     font-weight: bold;
-    color: #409eff;
+    color: #60a5fa;
     margin-bottom: 10px;
   }
   
   .stat-label {
     font-size: 14px;
-    color: #666;
+    color: #cbd5f5;
+  }
+  
+  @media (max-width: 960px) {
+    .header-content {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
   }
   </style>
 

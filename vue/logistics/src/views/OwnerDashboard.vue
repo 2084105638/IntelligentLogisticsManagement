@@ -89,7 +89,7 @@
                 <el-button type="primary" @click="loadWaybills" style="margin-left: 10px">查询</el-button>
               </div>
               <el-table :data="waybillList" style="width: 100%; margin-top: 20px" v-loading="loading">
-                <el-table-column prop="waybillId" label="运单号" width="120" />
+                <el-table-column prop="waybillIdentification" label="运单号" width="120" />
                 <el-table-column prop="goodsInformation" label="货物信息" width="200" />
                 <el-table-column prop="startAddress" label="发货地址" width="150" />
                 <el-table-column prop="endAddress" label="收货地址" width="150" />
@@ -149,7 +149,7 @@
                   <el-option
                     v-for="waybill in waybillList"
                     :key="waybill.waybillId"
-                    :label="`运单${waybill.waybillId} - ${waybill.goodsInformation}`"
+                    :label="`运单${waybill.waybillIdentification} - ${waybill.goodsInformation}`"
                     :value="waybill.waybillId"
                   />
                 </el-select>
@@ -163,15 +163,42 @@
           <!-- 个人信息 -->
           <el-tab-pane label="个人信息" name="profile">
             <el-card class="panel-card">
-              <el-form :model="profileForm" label-width="120px">
+              <el-form :model="profileForm" :rules="profileRules" ref="profileFormRef" label-width="120px">
                 <el-form-item label="手机号">
                   <el-input v-model="profileForm.phone" disabled />
+                  <div style="font-size: 12px; color: #909399; margin-top: 5px;">手机号不可修改</div>
                 </el-form-item>
-                <el-form-item label="邮箱">
-                  <el-input v-model="profileForm.email" />
+                <el-form-item label="邮箱" prop="email">
+                  <el-input v-model="profileForm.email" placeholder="请输入邮箱地址" />
+                </el-form-item>
+                <el-form-item label="原密码" prop="oldPassword">
+                  <el-input 
+                    v-model="profileForm.oldPassword" 
+                    type="password" 
+                    placeholder="修改密码时请输入原密码"
+                    show-password
+                  />
+                  <div style="font-size: 12px; color: #909399; margin-top: 5px;">不修改密码可留空</div>
+                </el-form-item>
+                <el-form-item label="新密码" prop="newPassword">
+                  <el-input 
+                    v-model="profileForm.newPassword" 
+                    type="password" 
+                    placeholder="请输入新密码"
+                    show-password
+                  />
+                </el-form-item>
+                <el-form-item label="确认密码" prop="confirmPassword">
+                  <el-input 
+                    v-model="profileForm.confirmPassword" 
+                    type="password" 
+                    placeholder="请再次输入新密码"
+                    show-password
+                  />
                 </el-form-item>
                 <el-form-item>
-                  <el-button type="primary" @click="updateProfile">保存</el-button>
+                  <el-button type="primary" @click="updateProfile" :loading="updating">保存</el-button>
+                  <el-button @click="resetProfileForm">重置</el-button>
                 </el-form-item>
               </el-form>
             </el-card>
@@ -183,7 +210,7 @@
     <!-- 运单详情对话框 -->
     <el-dialog v-model="detailDialogVisible" title="运单详情" width="800px">
       <el-descriptions :column="2" border v-if="currentWaybill">
-        <el-descriptions-item label="运单号">{{ currentWaybill.waybillId }}</el-descriptions-item>
+        <el-descriptions-item label="运单号">{{ currentWaybill.waybillIdentification }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(currentWaybill.status)">
             {{ getStatusDesc(currentWaybill.status) }}
@@ -212,6 +239,7 @@ import {
   getWaybillDetail,
   cancelWaybill as cancelWaybillAPI,
   getConsignorInfo,
+  updateConsignorInfo,
   WaybillCreateDTO,
   WaybillVO,
 } from '../api';
@@ -235,10 +263,71 @@ export default defineComponent({
     const detailDialogVisible = ref(false);
     const currentWaybill = ref<WaybillVO | null>(null);
     const userInfo = ref<any>(null);
+    const profileFormRef = ref();
+    const updating = ref(false);
     const profileForm = reactive({
       phone: '',
       email: '',
+      oldPassword: '',
+      newPassword: '',
+      confirmPassword: '',
     });
+
+    // 个人信息表单验证规则
+    const profileRules = {
+      email: [
+        { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' },
+      ],
+      oldPassword: [
+        {
+          validator: (rule: any, value: string, callback: (error?: Error) => void) => {
+            // 如果填写了新密码，原密码必填
+            if (profileForm.newPassword && !value) {
+              callback(new Error('修改密码时请输入原密码'));
+            } else {
+              callback();
+            }
+          },
+          trigger: 'blur',
+        },
+      ],
+      newPassword: [
+        {
+          validator: (rule: any, value: string, callback: (error?: Error) => void) => {
+            if (value) {
+              if (value.length < 6) {
+                callback(new Error('密码长度不能少于6位'));
+              } else if (value.length > 20) {
+                callback(new Error('密码长度不能超过20位'));
+              } else {
+                callback();
+              }
+            } else {
+              callback();
+            }
+          },
+          trigger: 'blur',
+        },
+      ],
+      confirmPassword: [
+        {
+          validator: (rule: any, value: string, callback: (error?: Error) => void) => {
+            if (profileForm.newPassword) {
+              if (!value) {
+                callback(new Error('请再次输入新密码'));
+              } else if (value !== profileForm.newPassword) {
+                callback(new Error('两次输入的密码不一致'));
+              } else {
+                callback();
+              }
+            } else {
+              callback();
+            }
+          },
+          trigger: 'blur',
+        },
+      ],
+    };
 
     const waybillForm = reactive<WaybillCreateDTO & { receivingConsignorId: number }>({
       receivingConsignorId: 0,
@@ -442,8 +531,53 @@ export default defineComponent({
       }
     };
 
-    const updateProfile = () => {
-      ElMessage.info('个人信息更新功能待实现');
+    const resetProfileForm = () => {
+      profileFormRef.value?.resetFields();
+      // 重新加载用户信息
+      loadUserInfo();
+    };
+
+    const updateProfile = async () => {
+      if (!profileFormRef.value) return;
+
+      try {
+        // 表单验证
+        await profileFormRef.value.validate();
+
+        updating.value = true;
+
+        // 构建更新数据
+        const updateData: any = {
+          email: profileForm.email,
+        };
+
+        // 如果填写了新密码，需要包含原密码和新密码
+        if (profileForm.newPassword) {
+          updateData.oldPassword = profileForm.oldPassword;
+          updateData.newPassword = profileForm.newPassword;
+        }
+
+        // 调用更新API
+        await updateConsignorInfo(updateData);
+
+        ElMessage.success('个人信息更新成功');
+        
+        // 清空密码字段
+        profileForm.oldPassword = '';
+        profileForm.newPassword = '';
+        profileForm.confirmPassword = '';
+        
+        // 重新加载用户信息
+        await loadUserInfo();
+      } catch (error: any) {
+        if (error.message) {
+          ElMessage.error(error.message);
+        } else {
+          ElMessage.error('更新失败，请稍后重试');
+        }
+      } finally {
+        updating.value = false;
+      }
     };
 
     // 初始化地图
@@ -704,7 +838,7 @@ export default defineComponent({
         const failedAddresses: string[] = [];
 
         for (const waybill of waybillsToShow) {
-          console.log(`处理运单 ${waybill.waybillId}: ${waybill.startAddress} -> ${waybill.endAddress}`);
+          console.log(`处理运单 ${waybill.waybillIdentification}: ${waybill.startAddress} -> ${waybill.endAddress}`);
           
           // 显示起点
           const startCoords = await geocodeAddress(waybill.startAddress);
@@ -842,6 +976,9 @@ export default defineComponent({
       currentWaybill,
       userInfo,
       profileForm,
+      profileFormRef,
+      profileRules,
+      updating,
       handleTabChange,
       handleCreateWaybill,
       resetForm,
@@ -850,6 +987,7 @@ export default defineComponent({
       cancelWaybill,
       confirmReceive,
       updateProfile,
+      resetProfileForm,
       handleLogout,
       getStatusDesc,
       getStatusType,

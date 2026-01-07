@@ -23,22 +23,35 @@
                 </el-select>
                 <el-input
                   v-model="userQuery.keyword"
-                  placeholder="搜索手机号、邮箱、姓名"
+                  placeholder="搜索用户名"
                   style="width: 200px; margin-left: 10px"
                   clearable
                 />
                 <el-button type="primary" @click="loadUsers" style="margin-left: 10px">查询</el-button>
+                <el-button type="success" @click="openCreateUserDialog" style="margin-left: 10px">
+                  新增用户
+                </el-button>
               </div>
               <el-table :data="userList" style="width: 100%; margin-top: 20px" v-loading="loading">
-                <el-table-column prop="id" label="ID" width="80" />
-                <el-table-column prop="role" label="角色" width="100">
+                <el-table-column prop="userId" label="用户ID" width="100" />
+                <el-table-column prop="type" label="角色" width="100">
                   <template #default="scope">
-                    <el-tag>{{ scope.row.role === 'consignor' ? '货主' : scope.row.role === 'dispatcher' ? '调度员' : '司机' }}</el-tag>
+                    <el-tag>
+                      {{
+                        scope.row.type === 1
+                          ? '货主'
+                          : scope.row.type === 2
+                            ? '调度员'
+                            : scope.row.type === 3
+                              ? '司机'
+                              : '管理员'
+                      }}
+                    </el-tag>
                   </template>
                 </el-table-column>
+                <el-table-column prop="username" label="用户名" width="150" />
                 <el-table-column prop="phone" label="手机号" width="120" />
                 <el-table-column prop="email" label="邮箱" width="180" />
-                <el-table-column prop="name" label="姓名" width="120" />
                 <el-table-column prop="status" label="状态" width="100">
                   <template #default="scope">
                     <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">
@@ -46,9 +59,9 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="createTime" label="创建时间" width="180" />
-                <el-table-column label="操作" width="200" fixed="right">
+                <el-table-column label="操作" width="260" fixed="right">
                   <template #default="scope">
+                    <el-button size="small" @click="openEditUserDialog(scope.row)">编辑</el-button>
                     <el-button
                       size="small"
                       :type="scope.row.status === 1 ? 'danger' : 'success'"
@@ -56,7 +69,7 @@
                     >
                       {{ scope.row.status === 1 ? '禁用' : '启用' }}
                     </el-button>
-                    <el-button size="small" type="danger" @click="deleteUser(scope.row.id)">删除</el-button>
+                    <el-button size="small" type="danger" @click="deleteUser(scope.row.userId)">删除</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -205,6 +218,47 @@
         </el-tabs>
       </el-main>
     </el-container>
+
+    <!-- 新增/编辑用户对话框 -->
+    <el-dialog v-model="userDialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="500px">
+      <el-form
+        ref="userFormRef"
+        :model="userForm"
+        :rules="userFormRules"
+        label-width="100px"
+      >
+        <el-form-item label="用户角色" prop="type">
+          <el-select v-model="userForm.type" placeholder="请选择角色" style="width: 100%">
+            <el-option :value="1" label="货主" />
+            <el-option :value="2" label="调度员" />
+            <el-option :value="3" label="司机" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="userForm.username" placeholder="请输入用户名" />
+        </el-form-item>
+        <el-form-item label="手机号" prop="phone">
+          <el-input v-model="userForm.phone" placeholder="请输入手机号（可选，司机/货主建议填写）" />
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="userForm.email" placeholder="请输入邮箱（可选，司机/货主建议填写）" />
+        </el-form-item>
+        <el-form-item label="密码" prop="password">
+          <el-input
+            v-model="userForm.password"
+            type="password"
+            show-password
+            :placeholder="isEdit ? '不填写则不修改密码' : '请输入初始密码'"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="userDialogVisible = false">取 消</el-button>
+          <el-button type="primary" @click="submitUserForm">确 定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -212,6 +266,19 @@
 import { defineComponent, reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import {
+  queryUsers,
+  createUser,
+  updateUser,
+  deleteUser as deleteUserApi,
+  updateUserStatus,
+  adminLogout,
+  type UserVO,
+  type UserQueryDTO,
+  type UserCreateDTO,
+  type UserUpdateDTO,
+} from '../api';
+import { clearAuth } from '../utils/auth';
 
 export default defineComponent({
   name: 'AdminDashboard',
@@ -221,7 +288,7 @@ export default defineComponent({
     const dataTab = ref('carType');
     const loading = ref(false);
     const logLoading = ref(false);
-    const userList = ref<any[]>([]);
+    const userList = ref<UserVO[]>([]);
     const carTypeList = ref<any[]>([]);
     const pricingList = ref<any[]>([]);
     const logList = ref<any[]>([]);
@@ -236,6 +303,43 @@ export default defineComponent({
       role: '',
       keyword: '',
     });
+
+    const userDialogVisible = ref(false);
+    const isEdit = ref(false);
+    const userFormRef = ref();
+    const userForm = reactive<UserCreateDTO & { userId?: number }>({
+      type: 1,
+      username: '',
+      password: '',
+      email: '',
+      phone: '',
+    });
+
+    const userFormRules = {
+      type: [{ required: true, message: '请选择用户角色', trigger: 'change' }],
+      username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+      password: [
+        {
+          required: false,
+          message: '请输入密码',
+          trigger: 'blur',
+        },
+      ],
+      phone: [
+        {
+          pattern: /^1[3-9]\d{9}$/,
+          message: '请输入有效的手机号',
+          trigger: 'blur',
+        },
+      ],
+      email: [
+        {
+          type: 'email',
+          message: '请输入正确的邮箱格式',
+          trigger: 'blur',
+        },
+      ],
+    };
 
     const logQuery = reactive({
       dateRange: [] as string[],
@@ -257,14 +361,25 @@ export default defineComponent({
     const loadUsers = async () => {
       loading.value = true;
       try {
-        // TODO: 调用API获取用户列表
-        // const result = await getUsers(userQuery, userPage.value, userPageSize.value);
-        // userList.value = result.data.records || [];
-        // userTotal.value = result.data.total || 0;
-        
-        // 模拟数据
-        userList.value = [];
-        userTotal.value = 0;
+        const dto: UserQueryDTO = {
+          current: userPage.value,
+          size: userPageSize.value,
+        };
+        if (userQuery.role) {
+          dto.type =
+            userQuery.role === 'consignor'
+              ? 1
+              : userQuery.role === 'dispatcher'
+                ? 2
+                : 3;
+        }
+        if (userQuery.keyword) {
+          dto.username = userQuery.keyword;
+        }
+        const result = await queryUsers(dto);
+        const pageData = result.data as any;
+        userList.value = (pageData.records || []) as UserVO[];
+        userTotal.value = pageData.total || 0;
       } catch (error: any) {
         ElMessage.error(error.message || '加载用户列表失败');
       } finally {
@@ -299,10 +414,65 @@ export default defineComponent({
       systemStats.cpuUsage = 45;
     };
 
-    const toggleUserStatus = async (user: any) => {
+    const openCreateUserDialog = () => {
+      isEdit.value = false;
+      userForm.userId = undefined;
+      userForm.type = 1;
+      userForm.username = '';
+      userForm.password = '';
+      userForm.email = '';
+      userForm.phone = '';
+      userDialogVisible.value = true;
+    };
+
+    const openEditUserDialog = (row: UserVO) => {
+      isEdit.value = true;
+      userForm.userId = row.userId;
+      userForm.type = row.type;
+      userForm.username = row.username;
+      userForm.email = row.email || '';
+      userForm.phone = row.phone || '';
+      userForm.password = '';
+      userDialogVisible.value = true;
+    };
+
+    const submitUserForm = async () => {
+      if (!userFormRef.value) return;
+      await userFormRef.value.validate(async (valid: boolean) => {
+        if (!valid) return;
+        try {
+          if (isEdit.value && userForm.userId) {
+            const dto: UserUpdateDTO = {
+              username: userForm.username,
+              email: userForm.email,
+              phone: userForm.phone,
+              password: userForm.password || undefined,
+            };
+            await updateUser(userForm.userId, dto);
+            ElMessage.success('用户信息更新成功');
+          } else {
+            const dto: UserCreateDTO = {
+              type: userForm.type,
+              username: userForm.username,
+              password: userForm.password,
+              email: userForm.email,
+              phone: userForm.phone,
+            };
+            await createUser(dto);
+            ElMessage.success('用户创建成功');
+          }
+          userDialogVisible.value = false;
+          loadUsers();
+        } catch (error: any) {
+          ElMessage.error(error.message || '保存失败');
+        }
+      });
+    };
+
+    const toggleUserStatus = async (user: UserVO) => {
       try {
-        // TODO: 调用API切换用户状态
-        // await toggleUserStatusAPI(user.id, user.status === 1 ? 0 : 1);
+        const newStatus = user.status === 1 ? 0 : 1;
+        await updateUserStatus(user.userId, newStatus);
         ElMessage.success('操作成功');
         loadUsers();
       } catch (error: any) {
@@ -317,8 +487,7 @@ export default defineComponent({
           cancelButtonText: '取消',
           type: 'warning',
         });
-        // TODO: 调用API删除用户
-        // await deleteUserAPI(userId);
+        await deleteUserApi(userId);
         ElMessage.success('删除成功');
         loadUsers();
       } catch (error: any) {
@@ -352,7 +521,13 @@ export default defineComponent({
       ElMessage.info('删除计费规则功能待实现');
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+      try {
+        await adminLogout();
+      } catch {
+        // 忽略登出错误
+      }
+      clearAuth();
       router.push('/login');
     };
 
@@ -377,6 +552,13 @@ export default defineComponent({
       loadUsers,
       loadLogs,
       loadSystemStats,
+      userDialogVisible,
+      isEdit,
+      userForm,
+      userFormRules,
+      openCreateUserDialog,
+      openEditUserDialog,
+      submitUserForm,
       toggleUserStatus,
       deleteUser,
       showCarTypeDialog,

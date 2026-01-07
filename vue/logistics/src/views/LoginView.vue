@@ -105,17 +105,11 @@
             <el-form-item label="手机号" prop="phone" v-if="activeRole === 'driver'">
               <el-input v-model="registerForm.phone" placeholder="请输入手机号" />
             </el-form-item>
-            <el-form-item label="邮箱" prop="email" v-if="activeRole === 'consignor'">
+            <el-form-item label="邮箱" prop="email" v-if="activeRole === 'consignor' || activeRole === 'driver'">
               <el-input v-model="registerForm.email" placeholder="请输入邮箱" />
             </el-form-item>
             <el-form-item label="手机号" prop="phone" v-if="activeRole === 'consignor'">
               <el-input v-model="registerForm.phone" placeholder="请输入手机号" />
-            </el-form-item>
-            <el-form-item label="姓名" prop="name" v-if="activeRole === 'driver'">
-              <el-input v-model="registerForm.name" placeholder="请输入姓名" />
-            </el-form-item>
-            <el-form-item label="驾驶证号" prop="licenseNumber" v-if="activeRole === 'driver'">
-              <el-input v-model="registerForm.licenseNumber" placeholder="请输入驾驶证号" />
             </el-form-item>
             <el-form-item label="密码" prop="password">
               <el-input
@@ -201,9 +195,10 @@ export default defineComponent({
         { required: true, message: '请输入手机号', trigger: 'blur' },
         { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号', trigger: 'blur' },
       ],
-      password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-      name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-      licenseNumber: [{ required: true, message: '请输入驾驶证号', trigger: 'blur' }],
+      password: [
+        { required: true, message: '请输入密码', trigger: 'blur' },
+        { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
+      ],
     };
 
     const handleRoleChange = () => {
@@ -290,9 +285,8 @@ export default defineComponent({
             } else if (activeRole.value === 'driver') {
               const data: DriverRegisterDTO = {
                 phone: registerForm.phone,
+                email: registerForm.email,
                 password: registerForm.password,
-                name: registerForm.name,
-                licenseNumber: registerForm.licenseNumber,
               };
               await driverRegister(data);
               ElMessage.success('注册成功，请登录');

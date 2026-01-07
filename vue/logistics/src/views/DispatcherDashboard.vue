@@ -1,20 +1,28 @@
 <template>
   <div class="dashboard">
     <el-container>
-      <el-header>
+      <el-header class="dashboard-header">
         <div class="header-content">
-          <h2>调度员工作台</h2>
+          <div class="header-left">
+            <div class="logo">
+              <span class="logo-dot" />
+              <div class="logo-text">
+                <div class="logo-title">调度员工作台</div>
+                <div class="logo-subtitle">运单调度与车辆管理</div>
+              </div>
+            </div>
+          </div>
           <div class="user-info">
-            <span>{{ userInfo?.username || '调度员' }}</span>
+            <span class="user-name">{{ userInfo?.username || '调度员' }}</span>
             <el-button link @click="handleLogout">退出登录</el-button>
           </div>
         </div>
       </el-header>
-      <el-main>
-        <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+      <el-main class="dashboard-main">
+        <el-tabs v-model="activeTab" @tab-change="handleTabChange" class="dashboard-tabs">
           <!-- 运单管理 -->
           <el-tab-pane label="运单管理" name="waybills">
-            <el-card>
+            <el-card class="panel-card">
               <div class="search-bar">
                 <el-select v-model="waybillQuery.status" placeholder="按状态筛选" clearable style="width: 150px">
                   <el-option label="待分配" :value="0" />
@@ -31,7 +39,7 @@
                 <el-button type="primary" @click="loadWaybills" style="margin-left: 10px">查询</el-button>
               </div>
               <el-table :data="waybillList" style="width: 100%; margin-top: 20px" v-loading="loading">
-                <el-table-column prop="waybillId" label="运单号" width="120" />
+                <el-table-column prop="waybillIdentification" label="运单号" width="120" />
                 <el-table-column prop="goodsInformation" label="货物信息" width="200" />
                 <el-table-column prop="startAddress" label="发货地址" width="150" />
                 <el-table-column prop="endAddress" label="收货地址" width="150" />
@@ -85,7 +93,7 @@
 
           <!-- 车辆管理 -->
           <el-tab-pane label="车辆管理" name="cars">
-        <el-card>
+            <el-card class="panel-card">
               <div class="search-bar">
                 <el-button type="primary" @click="showCarDialog">新增车辆</el-button>
                 <el-select
@@ -115,7 +123,28 @@
                     </div>
                   </template>
                 </el-table-column>
-                <el-table-column prop="location" label="位置" width="150" />
+                <el-table-column label="位置" width="200">
+                  <template #default="scope">
+                    <div v-if="scope.row.location">
+                      <div v-if="scope.row.locationName" style="color: #67c23a;">
+                        {{ scope.row.locationName }}
+                      </div>
+                      <div v-else-if="scope.row.location.match(/^[\d.]+,\s*[\d.]+$/)" style="color: #909399; font-size: 12px;">
+                        <el-button 
+                          type="text" 
+                          size="small" 
+                          @click="reverseGeocodeCarLocationInList(scope.row)"
+                        >
+                          查询地址
+                        </el-button>
+                      </div>
+                      <div v-else>
+                        {{ scope.row.location }}
+                      </div>
+                    </div>
+                    <span v-else style="color: #909399;">未设置</span>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="status" label="状态" width="100">
                   <template #default="scope">
                     <el-tag :type="getCarStatusType(scope.row.status)">
@@ -153,7 +182,7 @@
 
           <!-- 在途监控 -->
           <el-tab-pane label="在途监控" name="monitor">
-            <el-card>
+            <el-card class="panel-card">
               <div class="map-controls" style="margin-bottom: 15px">
                 <el-select v-model="selectedCarId" placeholder="选择车辆" clearable style="width: 200px" @change="onCarSelectChange">
                   <el-option
@@ -174,7 +203,7 @@
           <el-tab-pane label="数据统计" name="statistics">
             <el-row :gutter="20">
               <el-col :span="6">
-                <el-card>
+                <el-card class="panel-card">
                   <div class="stat-item">
                     <div class="stat-value">{{ statistics.totalWaybills }}</div>
                     <div class="stat-label">总运单数</div>
@@ -182,30 +211,30 @@
                 </el-card>
               </el-col>
               <el-col :span="6">
-                <el-card>
+                <el-card class="panel-card">
                   <div class="stat-item">
                     <div class="stat-value">{{ statistics.completedWaybills }}</div>
                     <div class="stat-label">已完成运单</div>
                   </div>
-        </el-card>
-      </el-col>
-              <el-col :span="6">
-        <el-card>
-                  <div class="stat-item">
-                    <div class="stat-value">{{ statistics.onTimeRate }}%</div>
-                    <div class="stat-label">准时率</div>
-            </div>
                 </el-card>
               </el-col>
               <el-col :span="6">
-                <el-card>
+                <el-card class="panel-card">
+                  <div class="stat-item">
+                    <div class="stat-value">{{ statistics.onTimeRate }}%</div>
+                    <div class="stat-label">准时率</div>
+                  </div>
+                </el-card>
+              </el-col>
+              <el-col :span="6">
+                <el-card class="panel-card">
                   <div class="stat-item">
                     <div class="stat-value">{{ statistics.totalCars }}</div>
                     <div class="stat-label">车辆总数</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+                  </div>
+                </el-card>
+              </el-col>
+            </el-row>
           </el-tab-pane>
         </el-tabs>
       </el-main>
@@ -215,7 +244,7 @@
     <el-dialog v-model="assignDialogVisible" title="派单" width="600px">
       <el-form :model="assignForm" label-width="100px">
         <el-form-item label="运单号">
-          <el-input v-model="assignForm.waybillId" disabled />
+          <el-input :value="currentWaybill?.waybillIdentification || assignForm.waybillId" disabled />
         </el-form-item>
         <el-form-item label="选择车辆" required>
           <el-select v-model="assignForm.carId" placeholder="请选择车辆" style="width: 100%">
@@ -235,7 +264,7 @@
     </el-dialog>
 
     <!-- 车辆编辑对话框 -->
-    <el-dialog v-model="carDialogVisible" :title="carDialogTitle" width="600px">
+    <el-dialog v-model="carDialogVisible" :title="carDialogTitle" width="800px">
       <el-form :model="carForm" :rules="carRules" ref="carFormRef" label-width="100px">
         <el-form-item label="司机" prop="driverId">
           <div class="driver-edit">
@@ -257,7 +286,22 @@
           </div>
         </el-form-item>
         <el-form-item label="位置">
-          <el-input v-model="carForm.location" placeholder="格式: lat,lng 或 地址" />
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <el-input 
+              v-model="carForm.location" 
+              placeholder="格式: lat,lng 或 地址，也可点击地图选择位置"
+              readonly
+            />
+            <div style="display: flex; gap: 10px;">
+              <el-button type="primary" size="small" @click="initCarLocationMap">在地图上选择位置</el-button>
+              <el-button size="small" @click="clearCarLocation">清除位置</el-button>
+            </div>
+            <div v-if="carLocationMapVisible" id="carLocationMapContainer" style="height: 400px; width: 100%; border-radius: 8px; overflow: hidden;"></div>
+            <div v-if="carForm.location && carForm.location.match(/^[\d.]+,\s*[\d.]+$/)">
+              <el-button type="success" size="small" @click="reverseGeocodeCarLocation">查询位置名称</el-button>
+              <span v-if="carLocationName" style="margin-left: 10px; color: #67c23a;">{{ carLocationName }}</span>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="saveCar">保存</el-button>
@@ -269,7 +313,7 @@
     <!-- 运单详情对话框 -->
     <el-dialog v-model="detailDialogVisible" title="运单详情" width="800px">
       <el-descriptions :column="2" border v-if="currentWaybill">
-        <el-descriptions-item label="运单号">{{ currentWaybill.waybillId }}</el-descriptions-item>
+        <el-descriptions-item label="运单号">{{ currentWaybill.waybillIdentification }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(currentWaybill.status)">
             {{ getStatusDesc(currentWaybill.status) }}
@@ -383,6 +427,11 @@ export default defineComponent({
     const selectedCarId = ref<number | null>(null);
     let mapInstance: any = null;
     let markers: any[] = [];
+    // 车辆位置选择地图
+    let carLocationMapInstance: any = null;
+    let carLocationMarker: any = null;
+    const carLocationMapVisible = ref(false);
+    const carLocationName = ref('');
 
     onMounted(() => {
       loadUserInfo();
@@ -502,6 +551,34 @@ export default defineComponent({
       }
     };
 
+    // 批量逆地理编码车辆位置
+    const batchReverseGeocodeCars = async (cars: any[]) => {
+      const apiKey = String(AMAP_API_KEY);
+      const promises = cars.map(async (car) => {
+        if (!car.location) return;
+        
+        const match = car.location.match(/([\d.]+),\s*([\d.]+)/);
+        if (!match) return;
+        
+        const lat = match[1];
+        const lng = match[2];
+        const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+        
+        try {
+          const response = await fetch(url);
+          const data = await response.json();
+          
+          if (data.status === '1' && data.regeocode) {
+            car.locationName = data.regeocode.formatted_address || '未知地址';
+          }
+        } catch (error) {
+          console.warn(`车辆 ${car.carId} 位置查询失败:`, error);
+        }
+      });
+      
+      await Promise.all(promises);
+    };
+
     const loadCars = async () => {
       carLoading.value = true;
       try {
@@ -514,6 +591,9 @@ export default defineComponent({
           carTotal.value = pageData.total || 0;
           // 获取可用车辆用于派单
           availableCars.value = carList.value.filter((car) => car.status === 0);
+          
+          // 自动批量查询所有有坐标的车辆的位置名称
+          await batchReverseGeocodeCars(carList.value);
         }
       } catch (error: any) {
         // 只在真正严重错误时显示提示（如401、403等），其他错误静默处理
@@ -552,7 +632,8 @@ export default defineComponent({
     };
 
     const showAssignDialog = (row: WaybillVO) => {
-      assignForm.waybillId = row.waybillId;
+      currentWaybill.value = row; // 设置当前运单以便显示 waybillIdentification
+      assignForm.waybillId = row.waybillId; // 保留 waybillId 用于API调用
       assignForm.carId = null;
       // 重新加载可用车辆
       loadCars();
@@ -604,6 +685,8 @@ export default defineComponent({
           (carForm as any)[key] = '';
         }
       });
+      carLocationName.value = '';
+      carLocationMapVisible.value = false;
       carDialogVisible.value = true;
     };
 
@@ -617,7 +700,217 @@ export default defineComponent({
       carForm.driverName = row.driverName || '';
       carForm.location = row.location;
       carForm.status = row.status;
+      carLocationName.value = '';
+      carLocationMapVisible.value = false;
       carDialogVisible.value = true;
+      
+      // 如果已有位置且是坐标格式，自动查询地址名称
+      if (carForm.location && carForm.location.match(/^[\d.]+,\s*[\d.]+$/)) {
+        setTimeout(() => {
+          reverseGeocodeCarLocation();
+        }, 500);
+      }
+    };
+
+    // 初始化车辆位置选择地图
+    const initCarLocationMap = () => {
+      // 先显示地图容器
+      carLocationMapVisible.value = true;
+
+      // 等待DOM更新后再初始化地图
+      setTimeout(() => {
+        const container = document.getElementById('carLocationMapContainer');
+        if (!container) {
+          ElMessage.warning('地图容器不存在，请稍后重试');
+          carLocationMapVisible.value = false;
+          return;
+        }
+
+        if (typeof (window as any).AMap === 'undefined') {
+          const apiKey = String(AMAP_API_KEY);
+          if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.trim() === '') {
+            ElMessage.warning('请先配置高德地图API密钥，详见 src/config/map.ts');
+            carLocationMapVisible.value = false;
+            return;
+          }
+          const script = document.createElement('script');
+          script.type = 'text/javascript';
+          script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&callback=initCarLocationAMap`;
+          script.async = true;
+          (window as any).initCarLocationAMap = () => {
+            createCarLocationMapInstance();
+          };
+          document.head.appendChild(script);
+        } else {
+          createCarLocationMapInstance();
+        }
+      }, 300); // 增加等待时间，确保对话框和DOM完全渲染
+    };
+
+    // 创建车辆位置选择地图实例
+    const createCarLocationMapInstance = () => {
+      const container = document.getElementById('carLocationMapContainer');
+      if (!container) return;
+
+      try {
+        // 如果已有实例，先销毁
+        if (carLocationMapInstance) {
+          carLocationMapInstance.destroy();
+          carLocationMapInstance = null;
+          carLocationMarker = null;
+        }
+
+        // 解析当前位置（如果有）
+        let center: [number, number] = DEFAULT_MAP_CENTER;
+        if (carForm.location) {
+          const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
+          if (match) {
+            center = [parseFloat(match[2]), parseFloat(match[1])]; // [lng, lat]
+          }
+        }
+
+        carLocationMapInstance = new (window as any).AMap.Map('carLocationMapContainer', {
+          zoom: 13,
+          center: center,
+        });
+
+        // 如果已有位置，显示标记
+        if (carForm.location && carForm.location.match(/^[\d.]+,\s*[\d.]+$/)) {
+          const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
+          if (match) {
+            const lat = parseFloat(match[1]);
+            const lng = parseFloat(match[2]);
+            carLocationMarker = new (window as any).AMap.Marker({
+              position: [lng, lat],
+              draggable: true,
+            });
+            carLocationMarker.setMap(carLocationMapInstance);
+            carLocationMapInstance.setCenter([lng, lat]);
+            
+            // 标记拖拽事件
+            carLocationMarker.on('dragend', () => {
+              const position = carLocationMarker.getPosition();
+              const lat = position.getLat();
+              const lng = position.getLng();
+              carForm.location = `${lat},${lng}`;
+              carLocationName.value = '';
+            });
+          }
+        }
+
+        // 地图点击事件
+        carLocationMapInstance.on('click', (e: any) => {
+          const lng = e.lnglat.getLng();
+          const lat = e.lnglat.getLat();
+          carForm.location = `${lat},${lng}`;
+          carLocationName.value = '';
+
+          // 移除旧标记
+          if (carLocationMarker) {
+            carLocationMapInstance.remove(carLocationMarker);
+          }
+
+          // 添加新标记
+          carLocationMarker = new (window as any).AMap.Marker({
+            position: [lng, lat],
+            draggable: true,
+          });
+          carLocationMarker.setMap(carLocationMapInstance);
+
+          // 标记拖拽事件
+          carLocationMarker.on('dragend', () => {
+            const position = carLocationMarker.getPosition();
+            const lat = position.getLat();
+            const lng = position.getLng();
+            carForm.location = `${lat},${lng}`;
+            carLocationName.value = '';
+          });
+
+          ElMessage.success(`已选择位置: ${lat}, ${lng}`);
+        });
+      } catch (error) {
+        console.error('地图初始化失败:', error);
+        ElMessage.warning('地图初始化失败，请检查高德地图API配置');
+      }
+    };
+
+    // 清除车辆位置
+    const clearCarLocation = () => {
+      carForm.location = '';
+      carLocationName.value = '';
+      if (carLocationMarker) {
+        carLocationMapInstance?.remove(carLocationMarker);
+        carLocationMarker = null;
+      }
+      ElMessage.info('已清除位置');
+    };
+
+    // 逆地理编码：将坐标转换为地址
+    const reverseGeocodeCarLocation = async () => {
+      if (!carForm.location) {
+        ElMessage.warning('请先选择位置');
+        return;
+      }
+
+      const match = carForm.location.match(/([\d.]+),\s*([\d.]+)/);
+      if (!match) {
+        ElMessage.warning('位置格式不正确，应为 lat,lng');
+        return;
+      }
+
+      const lat = match[1];
+      const lng = match[2];
+      const apiKey = String(AMAP_API_KEY);
+      const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.status === '1' && data.regeocode) {
+          carLocationName.value = data.regeocode.formatted_address || '未知地址';
+          ElMessage.success('位置查询成功');
+        } else {
+          ElMessage.warning('位置查询失败: ' + (data.info || '未知错误'));
+        }
+      } catch (error: any) {
+        console.error('逆地理编码失败:', error);
+        ElMessage.error('位置查询失败: ' + (error.message || '未知错误'));
+      }
+    };
+
+    // 在列表中逆地理编码车辆位置
+    const reverseGeocodeCarLocationInList = async (car: any) => {
+      if (!car.location) {
+        ElMessage.warning('该车辆没有位置信息');
+        return;
+      }
+
+      const match = car.location.match(/([\d.]+),\s*([\d.]+)/);
+      if (!match) {
+        ElMessage.warning('位置格式不正确');
+        return;
+      }
+
+      const lat = match[1];
+      const lng = match[2];
+      const apiKey = String(AMAP_API_KEY);
+      const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${apiKey}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.status === '1' && data.regeocode) {
+          car.locationName = data.regeocode.formatted_address || '未知地址';
+          ElMessage.success('位置查询成功');
+        } else {
+          ElMessage.warning('位置查询失败: ' + (data.info || '未知错误'));
+        }
+      } catch (error: any) {
+        console.error('逆地理编码失败:', error);
+        ElMessage.error('位置查询失败: ' + (error.message || '未知错误'));
+      }
     };
 
     const saveCar = async () => {
@@ -1164,6 +1457,12 @@ export default defineComponent({
       refreshMap,
       onCarSelectChange,
       showAllCars,
+      carLocationMapVisible,
+      carLocationName,
+      initCarLocationMap,
+      clearCarLocation,
+      reverseGeocodeCarLocation,
+      reverseGeocodeCarLocationInList,
     };
   },
 });
@@ -1171,8 +1470,21 @@ export default defineComponent({
 
 <style scoped>
 .dashboard {
+  position: relative;
   min-height: 100vh;
-  background-color: #f5f5f5;
+  overflow: hidden;
+  background: radial-gradient(circle at top left, #4f46e5 0, #0f172a 45%, #020617 100%);
+}
+
+.dashboard-header {
+  padding-inline: 0;
+  background: transparent;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.dashboard-main {
+  padding-inline: 0;
+  color: #e5e7eb;
 }
 
 .header-content {
@@ -1182,19 +1494,86 @@ export default defineComponent({
   height: 100%;
 }
 
+.header-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.85);
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.logo-subtitle {
+  font-size: 12px;
+  color: #cbd5f5;
+}
+
 .user-info {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.user-name {
+  color: #e5e7eb;
+}
+
+.dashboard-tabs :deep(.el-tabs__item) {
+  color: #cbd5f5;
+}
+
+.dashboard-tabs :deep(.el-tabs__item.is-active) {
+  color: #60a5fa;
+}
+
+.dashboard-tabs :deep(.el-tabs__active-bar) {
+  background-color: #60a5fa;
+}
+
+.dashboard-tabs :deep(.el-tabs__nav-wrap::after) {
+  background-color: rgba(148, 163, 184, 0.2);
+}
+
+.panel-card {
+  background: rgba(15, 23, 42, 0.97);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.9);
+}
+
+.panel-card :deep(.el-card__body) {
+  color: #e5e7eb;
 }
 
 .search-bar {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .map-container {
-  background-color: #f0f0f0;
-  border-radius: 4px;
+  background-color: #020617;
+  border-radius: 8px;
 }
 
 .stat-item {
@@ -1204,13 +1583,13 @@ export default defineComponent({
 .stat-value {
   font-size: 32px;
   font-weight: bold;
-  color: #409eff;
+  color: #60a5fa;
   margin-bottom: 10px;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #666;
+  color: #cbd5f5;
 }
 
 .driver-cell {
@@ -1220,7 +1599,7 @@ export default defineComponent({
 }
 
 .driver-id {
-  color: #909399;
+  color: #94a3b8;
   font-size: 12px;
 }
 
@@ -1233,6 +1612,14 @@ export default defineComponent({
 
 .driver-edit-tip {
   font-size: 12px;
-  color: #909399;
+  color: #94a3b8;
+}
+
+@media (max-width: 960px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 </style>
