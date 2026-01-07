@@ -9,6 +9,7 @@ import com.sylphy.entity.model.Dispatcher;
 import com.sylphy.service.*;
 import com.sylphy.vo.CarVO;
 import com.sylphy.vo.DispatcherLoginVO;
+import com.sylphy.vo.DriverVO;
 import com.sylphy.vo.WaybillAssignmentVO;
 import com.sylphy.vo.WaybillVO;
 import jakarta.validation.Valid;
@@ -23,17 +24,20 @@ public class DispatcherController {
     private final DispatcherService dispatcherService;
     private final DispatcherWaybillService dispatcherWaybillService;
     private final CarService carService;
+    private final DriverService driverService;
     private final AssignmentService assignmentService;
     private final RedisCache redisCache;
     
     public DispatcherController(DispatcherService dispatcherService,
                                 DispatcherWaybillService dispatcherWaybillService,
                                 CarService carService,
+                                DriverService driverService,
                                 AssignmentService assignmentService,
                                 RedisCache redisCache) {
         this.dispatcherService = dispatcherService;
         this.dispatcherWaybillService = dispatcherWaybillService;
         this.carService = carService;
+        this.driverService = driverService;
         this.assignmentService = assignmentService;
         this.redisCache = redisCache;
     }
@@ -381,6 +385,24 @@ public class DispatcherController {
         PageResult<WaybillAssignmentVO> result = assignmentService.listAssignments(oldWaybillId, newWaybillId, operatorId, current, size);
         return Result.success(result);
     }
-    
+
+    @PostMapping("/drivers")
+    /**
+     * 分页查询司机列表
+     * @param token 请求头认证token(String)
+     * @param queryDTO 查询条件(DriverQueryDTO)
+     * @return 分页结果(PageResult < DriverVO >)
+     * @throws com.sylphy.exception.BusinessException 查询异常时抛出
+     * @author apple
+     * @since 1.0.0
+     */
+    public Result<PageResult<DriverVO>> listDrivers(@RequestHeader("Authorization") String token,
+                                                    @RequestBody DriverQueryDTO queryDTO) {
+        Long dispatcherId = redisCache.getDispatcherIdByToken(token);
+        if (dispatcherId == null) {
+            return Result.error(401, "Token 已过期，请重新登录");
+        }
+        return Result.success(driverService.queryDrivers(queryDTO));
+    }
     
 }

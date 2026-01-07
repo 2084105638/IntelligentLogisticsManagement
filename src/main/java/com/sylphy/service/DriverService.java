@@ -3,9 +3,11 @@ package com.sylphy.service;
 import com.sylphy.common.PageResult;
 import com.sylphy.dto.DriverLocationUploadDTO;
 import com.sylphy.dto.DriverLoginDTO;
+import com.sylphy.dto.DriverQueryDTO;
 import com.sylphy.dto.DriverRegisterDTO;
 import com.sylphy.dto.WaybillQueryDTO;
 import com.sylphy.vo.DriverLoginVO;
+import com.sylphy.vo.DriverVO;
 import com.sylphy.vo.WaybillVO;
 import jakarta.validation.Valid;
 
@@ -27,4 +29,12 @@ public interface DriverService {
      * @param dto      位置信息
      */
     void uploadLocation(Long driverId, DriverLocationUploadDTO dto);
+
+    /**
+     * 分页查询司机列表
+     *
+     * @param queryDTO 查询条件
+     * @return 司机列表
+     */
+    PageResult<DriverVO> queryDrivers(DriverQueryDTO queryDTO);
 }

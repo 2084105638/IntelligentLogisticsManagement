@@ -10,6 +10,7 @@ import com.sylphy.common.StringTools;
 import com.sylphy.common.WaybillStatus;
 import com.sylphy.dto.DriverLocationUploadDTO;
 import com.sylphy.dto.DriverLoginDTO;
+import com.sylphy.dto.DriverQueryDTO;
 import com.sylphy.dto.DriverRegisterDTO;
 import com.sylphy.dto.WaybillQueryDTO;
 import com.sylphy.entity.model.Car;
@@ -25,6 +26,7 @@ import com.sylphy.mapper.UserDao;
 import com.sylphy.mapper.WaybillDao;
 import com.sylphy.service.DriverService;
 import com.sylphy.vo.DriverLoginVO;
+import com.sylphy.vo.DriverVO;
 import com.sylphy.vo.WaybillVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -178,6 +180,28 @@ public class DriverServiceImpl implements DriverService {
                 locationDao.insert(location);
             }
         }
+    }
+
+    @Override
+    public PageResult<DriverVO> queryDrivers(DriverQueryDTO queryDTO) {
+        // 1. 构建查询条件
+        LambdaQueryWrapper<Driver> wrapper = new LambdaQueryWrapper<>();
+        wrapper.like(StringUtils.hasText(queryDTO.getPhone()), Driver::getPhone, queryDTO.getPhone())
+               .like(StringUtils.hasText(queryDTO.getEmail()), Driver::getEmail, queryDTO.getEmail())
+               .orderByDesc(Driver::getDriverId); // 默认按ID倒序
+
+        // 2. 分页查询
+        Page<Driver> page = new Page<>(queryDTO.getCurrent(), queryDTO.getSize());
+        Page<Driver> resultPage = driverDao.selectPage(page, wrapper);
+
+        // 3. 转换为 VO
+        List<DriverVO> voList = resultPage.getRecords().stream().map(driver -> {
+            DriverVO vo = new DriverVO();
+            BeanUtil.copyProperties(driver, vo);
+            return vo;
+        }).collect(Collectors.toList());
+
+        return new PageResult<>(resultPage.getTotal(), resultPage.getCurrent(), resultPage.getSize(), voList);
     }
 
     private WaybillVO convertToVO(Waybill waybill) {
