@@ -36,6 +36,7 @@ public class CarServiceImpl implements CarService {
         car.setLocation(dto.getLocation());
         car.setStatus(dto.getStatus() == null ? 0 : dto.getStatus());
         car.setDriverId(dto.getDriverId());
+        car.setType(dto.getType());
         int rows = carDao.insert(car);
         if (rows != 1) {
             throw new BusinessException("创建车辆失败");
@@ -49,9 +50,15 @@ public class CarServiceImpl implements CarService {
         if (car == null) {
             throw new BusinessException("车辆不存在");
         }
-        if (dto.getDriverId() != null) car.setDriverId(dto.getDriverId());
-        if (StringUtils.hasText(dto.getLocation())) car.setLocation(dto.getLocation());
-        if (dto.getStatus() != null) car.setStatus(dto.getStatus());
+        if (dto.getDriverId() != null) {
+            car.setDriverId(dto.getDriverId());
+        }
+        if (StringUtils.hasText(dto.getLocation())) {
+            car.setLocation(dto.getLocation());
+        }
+        if (dto.getStatus() != null) {
+            car.setStatus(dto.getStatus());
+        }
         carDao.updateById(car);
     }
 
