@@ -43,7 +43,7 @@ public class DispatcherServiceImpl implements DispatcherService {
             throw new BusinessException("账号或密码错误");
         }
 
-//        String encryptedPassword = DigestUtil.md5Hex(loginDTO.getPassword());
+        String encryptedPassword = DigestUtil.md5Hex(loginDTO.getPassword());
         if (!loginDTO.getPassword().equals(dispatcher.getPassword())) {
             throw new BusinessException("账号或密码错误");
         }
