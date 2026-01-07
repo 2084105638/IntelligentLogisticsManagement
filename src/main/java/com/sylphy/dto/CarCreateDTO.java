@@ -8,4 +8,6 @@ public class CarCreateDTO {
     private Long driverId;
     private String location;
     private Integer status;
+    private Integer type;
+    
 }

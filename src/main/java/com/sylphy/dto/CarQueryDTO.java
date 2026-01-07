@@ -7,6 +7,7 @@ public class CarQueryDTO {
     private Integer status;
     private Long driverId;
     private String location;
+    private Integer type;
     private long current = 1;
     private long size = 10;
 }
